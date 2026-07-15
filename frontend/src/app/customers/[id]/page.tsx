@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
 interface Customer {
   id: string;
@@ -22,21 +23,23 @@ interface Activity {
   created_at: string;
 }
 
-export default function CustomerDetailPage({ params }: { params: { id: string } }) {
+export default function CustomerDetailPage() {
+  const params = useParams();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [noteContent, setNoteContent] = useState("");
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const id = params.id as string;
 
   useEffect(() => {
     loadCustomer();
     loadActivities();
-  }, [params.id]);
+  }, [id]);
 
   const loadCustomer = async () => {
     try {
-      const response = await fetch(`/api/customers/${params.id}`);
+      const response = await fetch(`/api/customers/${id}`);
       if (response.ok) {
         const data = await response.json();
         setCustomer(data);
@@ -46,7 +49,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
 
   const loadActivities = async () => {
     try {
-      const response = await fetch(`/api/activities/customer/${params.id}`);
+      const response = await fetch(`/api/activities/customer/${id}`);
       if (response.ok) {
         const data = await response.json();
         setActivities(data);
@@ -65,7 +68,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ customer_id: params.id, content: noteContent.trim() }),
+        body: JSON.stringify({ customer_id: id, content: noteContent.trim() }),
       });
 
       if (response.ok) {

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Mail, Users, ListTodo, BookOpen, Settings } from "lucide-react";
+import { LayoutDashboard, Mail, Users, ListTodo, BookOpen, Settings, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "@/context/ThemeContext";
 
 const menuItems = [
   { path: "/", icon: LayoutDashboard, label: "工作台" },
@@ -15,6 +16,29 @@ const menuItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
+
+  const getThemeIcon = () => {
+    switch (theme) {
+      case "light":
+        return <Sun className="w-4 h-4" />;
+      case "dark":
+        return <Moon className="w-4 h-4" />;
+      case "system":
+        return <Monitor className="w-4 h-4" />;
+    }
+  };
+
+  const getThemeLabel = () => {
+    switch (theme) {
+      case "light":
+        return "浅色";
+      case "dark":
+        return "深色";
+      case "system":
+        return "跟随系统";
+    }
+  };
 
   return (
     <aside className="fixed left-0 top-0 h-full w-[220px] bg-card border-r border-border flex flex-col z-50 shadow-sm">
@@ -45,7 +69,14 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border space-y-3">
+        <button
+          onClick={toggleTheme}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+        >
+          {getThemeIcon()}
+          <span>{getThemeLabel()}</span>
+        </button>
         <div className="text-xs text-muted-foreground">v0.4</div>
       </div>
     </aside>

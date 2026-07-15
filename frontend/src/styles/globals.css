@@ -15,6 +15,17 @@
   --color-accent-foreground: #111111;
   --color-border: #E5E5E2;
   --color-ring: #111111;
+  --color-amber-500: #F59E0B;
+  --color-amber-600: #D97706;
+  --color-green-500: #22C55E;
+  --color-green-600: #16A34A;
+  --color-red-500: #EF4444;
+  --color-red-600: #DC2626;
+  --color-yellow-500: #EAB308;
+  --color-yellow-700: #A16207;
+  --color-blue-500: #3B82F6;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
 }
 
 html {
@@ -47,4 +58,29 @@ textarea:focus {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #B0B0AE;
+}
+
+.dark {
+  --color-background: #111111;
+  --color-foreground: #F5F5F5;
+  --color-card: #1C1C1E;
+  --color-card-foreground: #F5F5F5;
+  --color-primary: #F5F5F5;
+  --color-primary-foreground: #111111;
+  --color-secondary: #2C2C2E;
+  --color-secondary-foreground: #F5F5F5;
+  --color-muted: #2C2C2E;
+  --color-muted-foreground: #A0A0A0;
+  --color-accent: #2C2C2E;
+  --color-accent-foreground: #F5F5F5;
+  --color-border: #2C2C2E;
+  --color-ring: #F5F5F5;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4A4A4C;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6A6A6C;
 }
