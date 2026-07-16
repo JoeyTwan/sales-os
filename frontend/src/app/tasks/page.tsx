@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { List, Calendar, Plus, Check, X, Clock, AlertCircle, ChevronRight } from "lucide-react";
+import { List, Calendar, Plus, Check, X, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 
 interface Task {
   id: string;
@@ -20,13 +20,15 @@ interface GroupedTasks {
   today: Task[];
   thisWeek: Task[];
   future: Task[];
-  noDate: Task[];
+  done: Task[];
 }
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [showModal, setShowModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -57,6 +59,19 @@ export default function TasksPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ status: newStatus }),
+      });
+      loadTasks();
+    } catch {}
+  };
+
+  const handleStatusChange = async (task: Task, status: Task["status"]) => {
+    try {
+      await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
       });
       loadTasks();
     } catch {}
@@ -95,8 +110,13 @@ export default function TasksPage() {
 
     return tasks.reduce(
       (acc, task) => {
+        if (task.status === "DONE") {
+          acc.done.push(task);
+          return acc;
+        }
+
         if (!task.due_date) {
-          acc.noDate.push(task);
+          acc.future.push(task);
           return acc;
         }
 
@@ -113,7 +133,7 @@ export default function TasksPage() {
 
         return acc;
       },
-      { today: [], thisWeek: [], future: [], noDate: [] } as GroupedTasks
+      { today: [], thisWeek: [], future: [], done: [] } as GroupedTasks
     );
   };
 
@@ -139,6 +159,17 @@ export default function TasksPage() {
     }
   };
 
+  const getStatusLabel = (status: Task["status"]) => {
+    switch (status) {
+      case "TODO":
+        return "待办";
+      case "DOING":
+        return "进行中";
+      case "DONE":
+        return "已完成";
+    }
+  };
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
@@ -156,18 +187,37 @@ export default function TasksPage() {
 
   const grouped = groupTasks();
 
-  const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+  const getMonthName = (date: Date) => {
+    return date.toLocaleDateString("zh-CN", { year: "numeric", month: "long" });
+  };
 
   const getCalendarDays = () => {
-    const today = new Date();
-    const firstDay = new Date(today);
-    firstDay.setDate(today.getDate() - today.getDay());
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
 
-    const days: { date: Date; isToday: boolean; tasks: Task[] }[] = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(firstDay);
-      date.setDate(firstDay.getDate() + i);
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const days: { date: Date; isToday: boolean; isSelected: boolean; tasks: Task[]; isCurrentMonth: boolean }[] = [];
+
+    const startPadding = firstDay.getDay();
+    for (let i = startPadding - 1; i >= 0; i--) {
+      const date = new Date(year, month, -i);
+      days.push({
+        date,
+        isToday: false,
+        isSelected: false,
+        tasks: [],
+        isCurrentMonth: false,
+      });
+    }
+
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      const date = new Date(year, month, i);
       date.setHours(0, 0, 0, 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
       const dayTasks = tasks.filter((task) => {
         if (!task.due_date) return false;
@@ -178,39 +228,84 @@ export default function TasksPage() {
 
       days.push({
         date,
-        isToday: date.getTime() === today.setHours(0, 0, 0, 0),
+        isToday: date.getTime() === today.getTime(),
+        isSelected: selectedDate?.getTime() === date.getTime(),
         tasks: dayTasks,
+        isCurrentMonth: true,
       });
     }
+
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      const date = new Date(year, month + 1, i);
+      days.push({
+        date,
+        isToday: false,
+        isSelected: false,
+        tasks: [],
+        isCurrentMonth: false,
+      });
+    }
+
     return days;
   };
 
   const calendarDays = getCalendarDays();
+  const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+
+  const getSelectedDateTasks = () => {
+    if (!selectedDate) return [];
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+    return tasks.filter((task) => {
+      if (!task.due_date) return false;
+      const dueDate = new Date(task.due_date);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate.getTime() === selected.getTime();
+    });
+  };
+
+  const prevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+    setSelectedDate(null);
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+    setSelectedDate(null);
+  };
+
+  const goToToday = () => {
+    setCurrentMonth(new Date());
+    setSelectedDate(null);
+  };
+
+  const selectedTasks = getSelectedDateTasks();
 
   return (
     <div className="py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold">任务管理</h1>
+          <h1 className="text-2xl font-semibold">任务中心</h1>
           <p className="text-sm text-muted-foreground mt-1">共 {tasks.length} 个任务</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center bg-muted rounded-lg p-1">
+          <div className="flex items-center bg-card rounded-lg p-1 shadow-sm">
             <button
               onClick={() => setViewMode("list")}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === "list" ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <List className="w-4 h-4" />
+              列表
             </button>
             <button
               onClick={() => setViewMode("calendar")}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === "calendar" ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === "calendar" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Calendar className="w-4 h-4" />
+              日历
             </button>
           </div>
           <button
@@ -229,7 +324,7 @@ export default function TasksPage() {
             <div className="bg-card rounded-xl shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Clock className="w-4 h-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-muted-foreground">今日任务</h2>
+                <h2 className="text-sm font-semibold text-muted-foreground">今天</h2>
                 <span className="text-xs text-muted-foreground ml-2">{grouped.today.length} 项</span>
               </div>
               <div className="space-y-3">
@@ -257,12 +352,26 @@ export default function TasksPage() {
                       {task.description && (
                         <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
                       )}
+                      {task.due_date && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{formatDate(task.due_date)}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
+                      <select
+                        value={task.status}
+                        onChange={(e) => handleStatusChange(task, e.target.value as Task["status"])}
+                        className="text-xs bg-transparent border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      >
+                        <option value="TODO">待办</option>
+                        <option value="DOING">进行中</option>
+                        <option value="DONE">已完成</option>
+                      </select>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityClass(task.priority)}`}>
                         {getPriorityLabel(task.priority)}
                       </span>
-                      <span className="text-xs text-muted-foreground">{formatDate(task.due_date)}</span>
                     </div>
                   </div>
                 ))}
@@ -274,7 +383,7 @@ export default function TasksPage() {
             <div className="bg-card rounded-xl shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar className="w-4 h-4 text-blue-500" />
-                <h2 className="text-sm font-semibold text-muted-foreground">本周任务</h2>
+                <h2 className="text-sm font-semibold text-muted-foreground">本周</h2>
                 <span className="text-xs text-muted-foreground ml-2">{grouped.thisWeek.length} 项</span>
               </div>
               <div className="space-y-3">
@@ -302,12 +411,26 @@ export default function TasksPage() {
                       {task.description && (
                         <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
                       )}
+                      {task.due_date && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{formatDate(task.due_date)}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
+                      <select
+                        value={task.status}
+                        onChange={(e) => handleStatusChange(task, e.target.value as Task["status"])}
+                        className="text-xs bg-transparent border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      >
+                        <option value="TODO">待办</option>
+                        <option value="DOING">进行中</option>
+                        <option value="DONE">已完成</option>
+                      </select>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityClass(task.priority)}`}>
                         {getPriorityLabel(task.priority)}
                       </span>
-                      <span className="text-xs text-muted-foreground">{formatDate(task.due_date)}</span>
                     </div>
                   </div>
                 ))}
@@ -319,7 +442,7 @@ export default function TasksPage() {
             <div className="bg-card rounded-xl shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
                 <ChevronRight className="w-4 h-4 text-gray-500" />
-                <h2 className="text-sm font-semibold text-muted-foreground">未来任务</h2>
+                <h2 className="text-sm font-semibold text-muted-foreground">未来</h2>
                 <span className="text-xs text-muted-foreground ml-2">{grouped.future.length} 项</span>
               </div>
               <div className="space-y-3">
@@ -347,12 +470,26 @@ export default function TasksPage() {
                       {task.description && (
                         <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
                       )}
+                      {task.due_date && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{formatDate(task.due_date)}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
+                      <select
+                        value={task.status}
+                        onChange={(e) => handleStatusChange(task, e.target.value as Task["status"])}
+                        className="text-xs bg-transparent border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      >
+                        <option value="TODO">待办</option>
+                        <option value="DOING">进行中</option>
+                        <option value="DONE">已完成</option>
+                      </select>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityClass(task.priority)}`}>
                         {getPriorityLabel(task.priority)}
                       </span>
-                      <span className="text-xs text-muted-foreground">{formatDate(task.due_date)}</span>
                     </div>
                   </div>
                 ))}
@@ -360,43 +497,33 @@ export default function TasksPage() {
             </div>
           )}
 
-          {grouped.noDate.length > 0 && (
+          {grouped.done.length > 0 && (
             <div className="bg-card rounded-xl shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
-                <AlertCircle className="w-4 h-4 text-gray-500" />
-                <h2 className="text-sm font-semibold text-muted-foreground">无截止日期</h2>
-                <span className="text-xs text-muted-foreground ml-2">{grouped.noDate.length} 项</span>
+                <Check className="w-4 h-4 text-green-500" />
+                <h2 className="text-sm font-semibold text-muted-foreground">已完成</h2>
+                <span className="text-xs text-muted-foreground ml-2">{grouped.done.length} 项</span>
               </div>
               <div className="space-y-3">
-                {grouped.noDate.map((task) => (
+                {grouped.done.map((task) => (
                   <div
                     key={task.id}
-                    className={`flex items-start gap-4 p-3 rounded-lg transition-colors ${
-                      task.status === "DONE" ? "bg-muted/50 opacity-60" : "hover:bg-muted/30"
-                    }`}
+                    className="flex items-start gap-4 p-3 rounded-lg bg-muted/50 opacity-60"
                   >
                     <button
                       onClick={() => handleComplete(task)}
-                      className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        task.status === "DONE"
-                          ? "bg-green-500 border-green-500 text-white"
-                          : "border-border hover:border-primary"
-                      }`}
+                      className="mt-1 w-5 h-5 rounded-full border-2 bg-green-500 border-green-500 text-white flex items-center justify-center transition-colors"
                     >
-                      {task.status === "DONE" && <Check className="w-3 h-3" />}
+                      <Check className="w-3 h-3" />
                     </button>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${task.status === "DONE" ? "line-through text-muted-foreground" : ""}`}>
-                        {task.title}
-                      </p>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
+                      <p className="text-sm line-through text-muted-foreground">{task.title}</p>
+                      {task.due_date && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{formatDate(task.due_date)}</span>
+                        </div>
                       )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityClass(task.priority)}`}>
-                        {getPriorityLabel(task.priority)}
-                      </span>
                     </div>
                   </div>
                 ))}
@@ -414,51 +541,134 @@ export default function TasksPage() {
       )}
 
       {viewMode === "calendar" && (
-        <div className="bg-card rounded-xl shadow-sm p-6">
-          <div className="grid grid-cols-7 gap-2 mb-4">
-            {weekDays.map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-            {calendarDays.map((day) => (
-              <div
-                key={day.date.toDateString()}
-                className={`aspect-square rounded-lg p-2 flex flex-col transition-colors ${
-                  day.isToday ? "bg-primary/10" : "hover:bg-muted/30"
-                }`}
+        <div className="space-y-6">
+          <div className="bg-card rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={prevMonth}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
               >
-                <span
-                  className={`text-xs font-medium ${
-                    day.isToday ? "text-primary" : "text-muted-foreground"
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold">{getMonthName(currentMonth)}</h2>
+                <button
+                  onClick={goToToday}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  今天
+                </button>
+              </div>
+              <button
+                onClick={nextMonth}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 mb-4">
+              {weekDays.map((day) => (
+                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-2">
+              {calendarDays.map((day) => (
+                <div
+                  key={day.date.toDateString()}
+                  onClick={() => setSelectedDate(day.isCurrentMonth ? day.date : null)}
+                  className={`aspect-square rounded-lg p-2 flex flex-col transition-colors cursor-pointer ${
+                    day.isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : day.isToday
+                      ? "bg-primary/10"
+                      : day.isCurrentMonth
+                      ? "hover:bg-muted/30"
+                      : "text-muted-foreground/50"
                   }`}
                 >
-                  {day.date.getDate()}
-                </span>
-                <div className="flex-1 mt-1 flex flex-col gap-1 overflow-hidden">
-                  {day.tasks.slice(0, 3).map((task) => (
+                  <span
+                    className={`text-xs font-medium ${
+                      day.isSelected ? "text-primary-foreground" : day.isToday ? "text-primary" : ""
+                    }`}
+                  >
+                    {day.date.getDate()}
+                  </span>
+                  <div className="flex-1 mt-1 flex flex-col gap-0.5 overflow-hidden">
+                    {day.tasks.slice(0, 2).map((task) => (
+                      <div
+                        key={task.id}
+                        className={`h-2 rounded-full ${
+                          task.status === "DONE" ? "bg-green-500/50" : getPriorityClass(task.priority).split(" ")[0]
+                        }`}
+                        title={task.title}
+                      />
+                    ))}
+                    {day.tasks.length > 2 && (
+                      <span className="text-[10px] opacity-60">+{day.tasks.length - 2}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {selectedDate && (
+            <div className="bg-card rounded-xl shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-muted-foreground">
+                  {selectedDate.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" })}
+                </h2>
+                <button
+                  onClick={() => setSelectedDate(null)}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+              {selectedTasks.length > 0 ? (
+                <div className="space-y-3">
+                  {selectedTasks.map((task) => (
                     <div
                       key={task.id}
-                      onClick={() => handleComplete(task)}
-                      className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer transition-colors ${
-                        task.status === "DONE"
-                          ? "bg-green-500/10 text-green-600 line-through"
-                          : getPriorityClass(task.priority)
+                      className={`flex items-start gap-4 p-3 rounded-lg transition-colors ${
+                        task.status === "DONE" ? "bg-muted/50 opacity-60" : "hover:bg-muted/30"
                       }`}
-                      title={task.title}
                     >
-                      {task.title}
+                      <button
+                        onClick={() => handleComplete(task)}
+                        className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          task.status === "DONE"
+                            ? "bg-green-500 border-green-500 text-white"
+                            : "border-border hover:border-primary"
+                        }`}
+                      >
+                        {task.status === "DONE" && <Check className="w-3 h-3" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${task.status === "DONE" ? "line-through text-muted-foreground" : ""}`}>
+                          {task.title}
+                        </p>
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityClass(task.priority)}`}>
+                          {getPriorityLabel(task.priority)}
+                        </span>
+                      </div>
                     </div>
                   ))}
-                  {day.tasks.length > 3 && (
-                    <span className="text-xs text-muted-foreground">+{day.tasks.length - 3}</span>
-                  )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">当天没有任务</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

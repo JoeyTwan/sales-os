@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { ArrowRight, UserPlus, ListTodo, Archive } from "lucide-react";
 
 interface InboxItem {
   id: string;
@@ -26,14 +28,14 @@ export default function InboxPage() {
     } catch {}
   };
 
-  const handleStatusChange = async (id: string, status: InboxItem["status"]) => {
+  const handleArchive = async (id: string) => {
     try {
       await fetch(`/api/inbox/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: "ARCHIVED" }),
       });
       loadItems();
     } catch {}
@@ -78,7 +80,10 @@ export default function InboxPage() {
 
   return (
     <div className="py-8">
-      <h1 className="text-2xl font-semibold mb-8">收件箱</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-semibold">收件箱</h1>
+        <span className="text-sm text-muted-foreground">共 {items.length} 条记录</span>
+      </div>
 
       {pendingItems.length > 0 && (
         <div className="mb-8">
@@ -88,28 +93,42 @@ export default function InboxPage() {
               <div key={item.id} className="bg-card rounded-xl shadow-sm p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <p className="text-lg leading-relaxed">{item.content}</p>
+                    <Link href={`/inbox/${item.id}`} className="block group">
+                      <p className="text-lg leading-relaxed group-hover:text-primary transition-colors">{item.content}</p>
+                    </Link>
                     <p className="text-xs text-muted-foreground mt-3">{formatDate(item.created_at)}</p>
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(item.status)}`}>
                       {getStatusLabel(item.status)}
                     </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleStatusChange(item.id, "CONFIRMED")}
-                        className="px-4 py-2 text-sm bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20 transition-colors"
-                      >
-                        确认
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(item.id, "ARCHIVED")}
-                        className="px-4 py-2 text-sm bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
-                      >
-                        归档
-                      </button>
-                    </div>
+                    <Link href={`/inbox/${item.id}`} className="p-2 hover:bg-muted rounded-lg transition-colors">
+                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                    </Link>
                   </div>
+                </div>
+                <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                  <Link
+                    href={`/inbox/${item.id}`}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs bg-blue-500/10 text-blue-600 rounded-lg hover:bg-blue-500/20 transition-colors"
+                  >
+                    <UserPlus className="w-3 h-3" />
+                    <span>转为客户</span>
+                  </Link>
+                  <Link
+                    href={`/inbox/${item.id}`}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs bg-amber-500/10 text-amber-600 rounded-lg hover:bg-amber-500/20 transition-colors"
+                  >
+                    <ListTodo className="w-3 h-3" />
+                    <span>转为任务</span>
+                  </Link>
+                  <button
+                    onClick={() => handleArchive(item.id)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                  >
+                    <Archive className="w-3 h-3" />
+                    <span>归档</span>
+                  </button>
                 </div>
               </div>
             ))}
@@ -125,12 +144,19 @@ export default function InboxPage() {
               <div key={item.id} className="bg-card rounded-xl shadow-sm p-6 opacity-70">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <p className="text-lg leading-relaxed">{item.content}</p>
+                    <Link href={`/inbox/${item.id}`} className="block group">
+                      <p className="text-lg leading-relaxed group-hover:text-primary transition-colors">{item.content}</p>
+                    </Link>
                     <p className="text-xs text-muted-foreground mt-3">{formatDate(item.created_at)}</p>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(item.status)}`}>
-                    {getStatusLabel(item.status)}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(item.status)}`}>
+                      {getStatusLabel(item.status)}
+                    </span>
+                    <Link href={`/inbox/${item.id}`} className="p-2 hover:bg-muted rounded-lg transition-colors">
+                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}
@@ -146,7 +172,9 @@ export default function InboxPage() {
               <div key={item.id} className="bg-card rounded-xl shadow-sm p-6 opacity-50">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <p className="text-lg leading-relaxed">{item.content}</p>
+                    <Link href={`/inbox/${item.id}`} className="block group">
+                      <p className="text-lg leading-relaxed group-hover:text-primary transition-colors">{item.content}</p>
+                    </Link>
                     <p className="text-xs text-muted-foreground mt-3">{formatDate(item.created_at)}</p>
                   </div>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(item.status)}`}>

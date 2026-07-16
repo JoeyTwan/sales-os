@@ -1,13 +1,14 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Mail, Users, ListTodo, BookOpen, Settings, Sun, Moon, Monitor } from "lucide-react";
+import { LayoutDashboard, Users, ListTodo, BookOpen, Settings, Sun, Moon, Monitor, Sparkles } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
 const menuItems = [
   { path: "/", icon: LayoutDashboard, label: "工作台" },
-  { path: "/inbox", icon: Mail, label: "收件箱" },
+  { path: "/suggestions", icon: Sparkles, label: "AI建议", showBadge: true },
   { path: "/customers", icon: Users, label: "客户管理" },
   { path: "/tasks", icon: ListTodo, label: "任务管理" },
   { path: "/knowledge", icon: BookOpen, label: "知识库" },
@@ -17,6 +18,21 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    loadPendingCount();
+  }, []);
+
+  const loadPendingCount = async () => {
+    try {
+      const response = await fetch("/api/suggestions?status=PENDING");
+      if (response.ok) {
+        const data = await response.json();
+        setPendingCount(data.length);
+      }
+    } catch {}
+  };
 
   const getThemeIcon = () => {
     switch (theme) {
@@ -51,6 +67,7 @@ export default function Sidebar() {
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.path;
+          const showBadge = item.showBadge && pendingCount > 0;
 
           return (
             <Link
@@ -63,7 +80,12 @@ export default function Sidebar() {
               }`}
             >
               <Icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <span className="flex-1 text-left">{item.label}</span>
+              {showBadge && (
+                <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium bg-red-500 text-white rounded-full px-1">
+                  {pendingCount}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -77,7 +99,7 @@ export default function Sidebar() {
           {getThemeIcon()}
           <span>{getThemeLabel()}</span>
         </button>
-        <div className="text-xs text-muted-foreground">v0.4</div>
+        <div className="text-xs text-muted-foreground">v0.6</div>
       </div>
     </aside>
   );

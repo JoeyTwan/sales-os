@@ -30,6 +30,11 @@ interface Customer {
   updated_at: string;
 }
 
+interface Suggestion {
+  id: string;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED";
+}
+
 export default function DashboardPage() {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
@@ -37,6 +42,7 @@ export default function DashboardPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -44,6 +50,7 @@ export default function DashboardPage() {
     loadActivities();
     loadTasks();
     loadCustomers();
+    loadSuggestions();
   }, []);
 
   useEffect(() => {
@@ -102,13 +109,23 @@ export default function DashboardPage() {
     } catch {}
   };
 
+  const loadSuggestions = async () => {
+    try {
+      const response = await fetch("/api/suggestions?status=PENDING");
+      if (response.ok) {
+        const data = await response.json();
+        setPendingSuggestionsCount(data.length);
+      }
+    } catch {}
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim() || sending) return;
 
     setSending(true);
     try {
-      const response = await fetch("/api/inbox", {
+      const response = await fetch("/api/suggestions/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -117,10 +134,12 @@ export default function DashboardPage() {
       });
 
       if (response.ok) {
+        const data = await response.json();
         setContent("");
         setSuccess(true);
         textareaRef.current?.focus();
         loadActivities();
+        loadSuggestions();
       }
     } catch {
     } finally {
@@ -221,6 +240,14 @@ export default function DashboardPage() {
 
   return (
     <div className="py-8">
+      {pendingSuggestionsCount > 0 && (
+        <Link href="/suggestions" className="block mb-8 bg-amber-500/10 text-amber-600 rounded-xl p-4 hover:bg-amber-500/20 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">� AI建议有 {pendingSuggestionsCount} 条待确认</span>
+            <span className="text-xs">查看 →</span>
+          </div>
+        </Link>
+      )}
       <div className="mb-12">
         <h1 className="text-lg font-semibold text-muted-foreground mb-4">今天有什么需要记录？</h1>
         <form onSubmit={handleSubmit} className="bg-card rounded-xl shadow-sm p-6">
@@ -236,17 +263,17 @@ export default function DashboardPage() {
             className="w-full bg-transparent border-none outline-none resize-none text-lg leading-relaxed placeholder:text-muted-foreground/40 h-[180px]"
           />
           <div className="flex justify-between items-center mt-4 pt-4 border-t border-border">
-            <span className="text-xs text-muted-foreground">按 Enter 保存</span>
+            <span className="text-xs text-muted-foreground">按 Enter 分析</span>
             <button
               type="submit"
               disabled={!content.trim() || sending}
               className="px-5 py-2 bg-primary text-primary-foreground rounded-lg font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {sending ? "保存中..." : "保存"}
+              {sending ? "分析中..." : "分析"}
             </button>
           </div>
           {success && (
-            <p className="text-sm text-green-600 mt-3">已保存</p>
+            <p className="text-sm text-green-600 mt-3">分析完成，已生成建议</p>
           )}
         </form>
       </div>
