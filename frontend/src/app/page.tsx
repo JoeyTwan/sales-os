@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { X, CheckCircle, UserPlus, ListTodo, Edit3, Trash2 } from "lucide-react";
+import { X, CheckCircle, User, Folder, ListTodo, Calendar, FileText } from "lucide-react";
 
 interface Activity {
   id: string;
@@ -37,8 +37,13 @@ interface CustomerSuggestion {
   level: string;
   status: string;
   summary?: string;
-  next_action?: string;
-  next_action_date?: string;
+}
+
+interface ProjectSuggestion {
+  name: string;
+  description?: string;
+  budget?: number;
+  status: string;
 }
 
 interface TaskSuggestion {
@@ -48,14 +53,20 @@ interface TaskSuggestion {
   due_date?: string;
 }
 
-interface SuggestionJSON {
-  customer_suggestions: CustomerSuggestion[];
-  task_suggestions: TaskSuggestion[];
+interface MatchedCustomer {
+  id: string;
+  name: string;
+  confidence: number;
 }
 
 interface AnalyzeResult {
   suggestion_id: string;
-  suggestions: SuggestionJSON;
+  raw_content: string;
+  matched_customer: MatchedCustomer | null;
+  customers: CustomerSuggestion[];
+  contacts: any[];
+  projects: ProjectSuggestion[];
+  tasks: TaskSuggestion[];
 }
 
 export default function DashboardPage() {
@@ -66,11 +77,8 @@ export default function DashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState<AnalyzeResult | null>(null);
-  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
-  const [taskSuggestions, setTaskSuggestions] = useState<TaskSuggestion[]>([]);
-  const [editingCustomer, setEditingCustomer] = useState<string | null>(null);
-  const [editingTask, setEditingTask] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [expandedContent, setExpandedContent] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -146,14 +154,11 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         setAnalyzeResult(data);
-        setCustomerSuggestions(data.suggestions.customer_suggestions || []);
-        setTaskSuggestions(data.suggestions.task_suggestions || []);
         setContent("");
         setShowModal(true);
         textareaRef.current?.focus();
       }
-    } catch {
-    } finally {
+    } catch {} finally {
       setSending(false);
     }
   };
@@ -162,16 +167,25 @@ export default function DashboardPage() {
     if (!analyzeResult) return;
     setConfirming(true);
     try {
+      const payload: any = {};
+      if (analyzeResult.customers.length > 0) {
+        payload.customer = analyzeResult.customers[0];
+      }
+      if (analyzeResult.projects.length > 0) {
+        payload.project = analyzeResult.projects[0];
+      }
+      if (analyzeResult.tasks.length > 0) {
+        payload.tasks = analyzeResult.tasks;
+      }
+
       await fetch(`/api/suggestions/${analyzeResult.suggestion_id}/confirm`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          customer_suggestions: customerSuggestions,
-          task_suggestions: taskSuggestions,
-        }),
+        body: JSON.stringify(payload),
       });
+
       setShowModal(false);
       setAnalyzeResult(null);
       loadActivities();
@@ -184,34 +198,7 @@ export default function DashboardPage() {
   const handleCancel = () => {
     setShowModal(false);
     setAnalyzeResult(null);
-    setCustomerSuggestions([]);
-    setTaskSuggestions([]);
-    setEditingCustomer(null);
-    setEditingTask(null);
-  };
-
-  const handleEditCustomer = (index: number) => {
-    setEditingCustomer(index.toString());
-  };
-
-  const handleSaveCustomer = (index: number) => {
-    setEditingCustomer(null);
-  };
-
-  const handleDeleteCustomer = (index: number) => {
-    setCustomerSuggestions((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleEditTask = (index: number) => {
-    setEditingTask(index.toString());
-  };
-
-  const handleSaveTask = (index: number) => {
-    setEditingTask(null);
-  };
-
-  const handleDeleteTask = (index: number) => {
-    setTaskSuggestions((prev) => prev.filter((_, i) => i !== index));
+    setExpandedContent(false);
   };
 
   const handleTaskStatusChange = async (taskId: string, newStatus: Task["status"]) => {
@@ -314,6 +301,22 @@ export default function DashboardPage() {
       case "LOST":
         return "已丢失";
     }
+  };
+
+  const formatBudget = (budget: number | undefined) => {
+    if (!budget) return "";
+    if (budget >= 10000) {
+      return `${(budget / 10000).toFixed(0)}万`;
+    }
+    return `${budget}元`;
+  };
+
+  const hasData = () => {
+    return analyzeResult && (
+      analyzeResult.customers.length > 0 ||
+      analyzeResult.projects.length > 0 ||
+      analyzeResult.tasks.length > 0
+    );
   };
 
   return (
@@ -433,247 +436,162 @@ export default function DashboardPage() {
       )}
 
       {showModal && analyzeResult && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-xl font-semibold">AI分析结果</h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-border/50 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-primary" />
+                </div>
+                <h2 className="text-lg font-semibold">AI已识别以下内容</h2>
+              </div>
               <button
                 onClick={handleCancel}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
+                className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
-            <div className="p-6">
-              <div className="bg-muted/30 rounded-xl p-4 mb-6">
-                <p className="text-sm text-muted-foreground mb-2">原始输入</p>
-                <p className="text-lg leading-relaxed whitespace-pre-wrap">{content}</p>
-              </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {analyzeResult.matched_customer && (
+                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/5 rounded-lg px-3 py-2 mb-5">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>已匹配客户: {analyzeResult.matched_customer.name}</span>
+                </div>
+              )}
 
-              {customerSuggestions.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-                    <UserPlus className="w-4 h-4 text-blue-500" />
-                    <span>客户建议</span>
-                    <span className="text-xs text-muted-foreground ml-2">{customerSuggestions.length} 个</span>
-                  </h3>
-                  <div className="space-y-4">
-                    {customerSuggestions.map((customer, index) => (
-                      <div
-                        key={index}
-                        className="p-4 bg-muted/30 rounded-lg"
-                      >
-                        {editingCustomer === index.toString() ? (
-                          <div className="space-y-3">
-                            <input
-                              type="text"
-                              value={customer.name}
-                              onChange={(e) => {
-                                setCustomerSuggestions((prev) =>
-                                  prev.map((c, i) => (i === index ? { ...c, name: e.target.value } : c))
-                                );
-                              }}
-                              className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            />
-                            <input
-                              type="text"
-                              value={customer.company || ""}
-                              onChange={(e) => {
-                                setCustomerSuggestions((prev) =>
-                                  prev.map((c, i) => (i === index ? { ...c, company: e.target.value || undefined } : c))
-                                );
-                              }}
-                              placeholder="公司"
-                              className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            />
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => handleSaveCustomer(index)}
-                                className="px-3 py-1 text-xs bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20 transition-colors"
-                              >
-                                保存
-                              </button>
-                              <button
-                                onClick={() => setEditingCustomer(null)}
-                                className="px-3 py-1 text-xs text-muted-foreground hover:bg-muted rounded-lg transition-colors"
-                              >
-                                取消
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start justify-between">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-5">
+                  {analyzeResult.customers.length > 0 && (
+                    <div className="bg-muted/30 rounded-xl p-4">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
+                        <User className="w-4 h-4" />
+                        <span>客户</span>
+                      </div>
+                      <div className="space-y-2">
+                        {analyzeResult.customers.map((customer, index) => (
+                          <div key={index} className="flex items-center justify-between">
                             <div>
-                              <p className="font-medium">{customer.name}</p>
+                              <p className="font-medium text-foreground">{customer.name}</p>
                               {customer.company && (
                                 <p className="text-sm text-muted-foreground">{customer.company}</p>
                               )}
-                              <div className="flex gap-3 mt-2">
-                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
-                                  {getLevelLabel(customer.level)}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {customer.status === "ACTIVE" ? "跟进中" : customer.status === "FOLLOWING" ? "重点推进" : "已暂停"}
-                                </span>
-                              </div>
                             </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditCustomer(index)}
-                                className="p-2 hover:bg-muted rounded-lg transition-colors"
-                              >
-                                <Edit3 className="w-4 h-4 text-muted-foreground" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteCustomer(index)}
-                                className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-500" />
-                              </button>
-                            </div>
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
+                              {getLevelLabel(customer.level)}
+                            </span>
                           </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {taskSuggestions.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-                    <ListTodo className="w-4 h-4 text-amber-500" />
-                    <span>任务建议</span>
-                    <span className="text-xs text-muted-foreground ml-2">{taskSuggestions.length} 个</span>
-                  </h3>
-                  <div className="space-y-4">
-                    {taskSuggestions.map((task, index) => (
-                      <div
-                        key={index}
-                        className="p-4 bg-muted/30 rounded-lg"
-                      >
-                        {editingTask === index.toString() ? (
-                          <div className="space-y-3">
-                            <input
-                              type="text"
-                              value={task.title}
-                              onChange={(e) => {
-                                setTaskSuggestions((prev) =>
-                                  prev.map((t, i) => (i === index ? { ...t, title: e.target.value } : t))
-                                );
-                              }}
-                              className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            />
-                            <textarea
-                              value={task.description || ""}
-                              onChange={(e) => {
-                                setTaskSuggestions((prev) =>
-                                  prev.map((t, i) => (i === index ? { ...t, description: e.target.value || undefined } : t))
-                                );
-                              }}
-                              placeholder="任务描述"
-                              className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
-                              rows={2}
-                            />
-                            <div className="flex gap-3">
-                              <select
-                                value={task.priority}
-                                onChange={(e) => {
-                                  setTaskSuggestions((prev) =>
-                                    prev.map((t, i) => (i === index ? { ...t, priority: e.target.value } : t))
-                                  );
-                                }}
-                                className="flex-1 bg-transparent border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                              >
-                                <option value="HIGH">高优先级</option>
-                                <option value="MEDIUM">中优先级</option>
-                                <option value="LOW">低优先级</option>
-                              </select>
-                              <input
-                                type="date"
-                                value={task.due_date || ""}
-                                onChange={(e) => {
-                                  setTaskSuggestions((prev) =>
-                                    prev.map((t, i) => (i === index ? { ...t, due_date: e.target.value || undefined } : t))
-                                  );
-                                }}
-                                className="bg-transparent border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                              />
-                            </div>
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => handleSaveTask(index)}
-                                className="px-3 py-1 text-xs bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20 transition-colors"
-                              >
-                                保存
-                              </button>
-                              <button
-                                onClick={() => setEditingTask(null)}
-                                className="px-3 py-1 text-xs text-muted-foreground hover:bg-muted rounded-lg transition-colors"
-                              >
-                                取消
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start justify-between">
+                <div className="space-y-5">
+                  {analyzeResult.projects.length > 0 && (
+                    <div className="bg-muted/30 rounded-xl p-4">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
+                        <Folder className="w-4 h-4" />
+                        <span>项目</span>
+                      </div>
+                      <div className="space-y-2">
+                        {analyzeResult.projects.map((project, index) => (
+                          <div key={index} className="flex items-center justify-between">
                             <div>
-                              <p className="font-medium">{task.title}</p>
-                              {task.due_date && (
-                                <p className="text-sm text-muted-foreground mt-1">{formatDate(task.due_date)}</p>
+                              <p className="font-medium text-foreground">{project.name}</p>
+                              {project.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
                               )}
-                              <div className="flex gap-3 mt-2">
-                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getLevelClass(task.priority)}`}>
-                                  {getPriorityLabel(task.priority)}
-                                </span>
-                                <span className="text-xs text-muted-foreground">待办</span>
-                              </div>
                             </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditTask(index)}
-                                className="p-2 hover:bg-muted rounded-lg transition-colors"
-                              >
-                                <Edit3 className="w-4 h-4 text-muted-foreground" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTask(index)}
-                                className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-500" />
-                              </button>
+                            {project.budget && (
+                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-500/10 text-amber-600">
+                                {formatBudget(project.budget)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {analyzeResult.tasks.length > 0 && (
+                    <div className="bg-muted/30 rounded-xl p-4">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
+                        <ListTodo className="w-4 h-4" />
+                        <span>任务</span>
+                      </div>
+                      <div className="space-y-2">
+                        {analyzeResult.tasks.map((task, index) => (
+                          <div key={index} className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-foreground">{task.title}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {task.due_date && (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Calendar className="w-3 h-3" />
+                                  {formatDate(task.due_date)}
+                                </span>
+                              )}
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(task.priority)}`}>
+                                {getPriorityLabel(task.priority)}
+                              </span>
                             </div>
                           </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {(customerSuggestions.length === 0 && taskSuggestions.length === 0) && (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">未识别到可创建的客户或任务</p>
+              <div className="bg-muted/30 rounded-xl p-4 mt-5">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
+                  <FileText className="w-4 h-4" />
+                  <span>活动记录</span>
+                </div>
+                {analyzeResult.raw_content.length > 200 ? (
+                  <div>
+                    <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                      {expandedContent ? analyzeResult.raw_content : analyzeResult.raw_content.substring(0, 200) + "..."}
+                    </p>
+                    <button
+                      onClick={() => setExpandedContent(!expandedContent)}
+                      className="mt-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                    >
+                      {expandedContent ? "收起" : "展开"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                    {analyzeResult.raw_content}
+                  </p>
+                )}
+              </div>
+
+              {!hasData() && (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground">未识别到可创建的内容</p>
                   <p className="text-sm text-muted-foreground mt-2">请尝试输入包含客户名称、公司、预算、日期等关键词的内容</p>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t border-border">
+            <div className="flex justify-end gap-3 p-5 border-t border-border/50 bg-muted/20 flex-shrink-0">
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 bg-gray-500/10 text-gray-600 rounded-lg hover:bg-gray-500/20 transition-colors"
+                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={handleConfirm}
-                disabled={confirming || (customerSuggestions.length === 0 && taskSuggestions.length === 0)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                disabled={confirming || !hasData()}
+                className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CheckCircle className="w-4 h-4" />
-                <span>{confirming ? "确认中..." : "确认创建"}</span>
+                <span>{confirming ? "写入中..." : "确认写入CRM"}</span>
               </button>
             </div>
           </div>

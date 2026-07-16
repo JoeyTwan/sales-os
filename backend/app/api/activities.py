@@ -20,9 +20,19 @@ class ActivityForCustomerRequest(BaseModel):
     content: str
 
 
+class ActivityCreateRequest(BaseModel):
+    customer_id: Optional[str] = None
+    project_id: Optional[str] = None
+    content: str
+    source: str = "manual"
+
+
 class ActivitySummary(BaseModel):
     id: str
+    customer_id: Optional[str] = None
+    project_id: Optional[str] = None
     content: str
+    source: str
     activity_date: date
     created_at: datetime
 
@@ -30,8 +40,9 @@ class ActivitySummary(BaseModel):
 @router.post("/raw")
 def create_raw_activity(request: RawActivityRequest, db: Session = Depends(get_db)):
     activity = Activity(
-        customer_id="00000000-0000-0000-0000-000000000000",
-        type="NOTE",
+        customer_id=None,
+        project_id=None,
+        source="manual",
         content=request.content,
         activity_date=date.today()
     )
@@ -45,7 +56,23 @@ def create_raw_activity(request: RawActivityRequest, db: Session = Depends(get_d
 def create_activity_for_customer(request: ActivityForCustomerRequest, db: Session = Depends(get_db)):
     activity = Activity(
         customer_id=request.customer_id,
-        type="NOTE",
+        project_id=None,
+        source="manual",
+        content=request.content,
+        activity_date=date.today()
+    )
+    db.add(activity)
+    db.commit()
+    db.refresh(activity)
+    return {"id": activity.id, "content": activity.content}
+
+
+@router.post("")
+def create_activity(request: ActivityCreateRequest, db: Session = Depends(get_db)):
+    activity = Activity(
+        customer_id=request.customer_id,
+        project_id=request.project_id,
+        source=request.source,
         content=request.content,
         activity_date=date.today()
     )

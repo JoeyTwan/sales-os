@@ -1,23 +1,23 @@
 from enum import Enum
 from uuid import UUID
 from datetime import date, datetime
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class ActivityType(str, Enum):
-    VISIT = "VISIT"
-    CALL = "CALL"
-    WECHAT = "WECHAT"
-    MEETING = "MEETING"
-    EMAIL = "EMAIL"
-    NOTE = "NOTE"
+class ActivitySource(str, Enum):
+    CAPTURE = "capture"
+    MANUAL = "manual"
+    EMAIL = "email"
+    MEETING = "meeting"
 
 
 class ActivityBase(BaseModel):
-    customer_id: UUID
-    type: ActivityType
-    content: str
-    activity_date: date
+    customer_id: Optional[UUID] = Field(None, description="客户ID")
+    project_id: Optional[UUID] = Field(None, description="项目ID")
+    content: str = Field(..., description="活动内容")
+    source: ActivitySource = Field(ActivitySource.MANUAL, description="来源")
+    activity_date: date = Field(..., description="活动日期")
 
 
 class ActivityCreate(ActivityBase):

@@ -7,10 +7,17 @@ from .customer import (
     CustomerOut,
 )
 from .activity import (
-    ActivityType,
+    ActivitySource,
     ActivityBase,
     ActivityCreate,
     ActivityOut,
+)
+from .project import (
+    ProjectStatus,
+    ProjectBase,
+    ProjectCreate,
+    ProjectUpdate,
+    ProjectOut,
 )
 
 __all__ = [
@@ -20,8 +27,13 @@ __all__ = [
     "CustomerCreate",
     "CustomerUpdate",
     "CustomerOut",
-    "ActivityType",
+    "ActivitySource",
     "ActivityBase",
     "ActivityCreate",
     "ActivityOut",
+    "ProjectStatus",
+    "ProjectBase",
+    "ProjectCreate",
+    "ProjectUpdate",
+    "ProjectOut",
 ]

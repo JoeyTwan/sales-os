@@ -1,13 +1,16 @@
 from .customer import Customer, CustomerLevel, CustomerStatus
-from .activity import Activity, ActivityType
+from .activity import Activity, ActivitySource
 from .inbox import InboxItem, InboxStatus
+from .project import Project, ProjectStatus
 
 __all__ = [
     "Customer",
     "CustomerLevel",
     "CustomerStatus",
     "Activity",
-    "ActivityType",
+    "ActivitySource",
     "InboxItem",
     "InboxStatus",
+    "Project",
+    "ProjectStatus",
 ]
