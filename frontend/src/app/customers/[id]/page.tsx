@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, User, Folder, FileText, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, User, Folder, FileText, Calendar, Clock, Target, DollarSign, Users, Zap, TrendingUp, AlertTriangle, RefreshCw, Brain } from "lucide-react";
 
 interface Customer {
   id: string;
@@ -14,6 +14,18 @@ interface Customer {
   next_action_date: string;
   created_at: string;
   updated_at: string;
+  ai_summary?: CustomerAISummary;
+}
+
+interface CustomerAISummary {
+  stage: string;
+  budget: string;
+  decision_maker: string;
+  risk: string;
+  next_action: string;
+  estimated_close_date: string;
+  confidence: number;
+  last_activity_summary: string;
 }
 
 interface Project {
@@ -43,6 +55,7 @@ export default function CustomerDetailPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadCustomer();
@@ -82,6 +95,20 @@ export default function CustomerDetailPage() {
       }
     } catch {} finally {
       setLoading(false);
+    }
+  };
+
+  const refreshAISummary = async () => {
+    setRefreshing(true);
+    try {
+      const response = await fetch(`/api/customers/${id}/ai-summary/refresh`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        await loadCustomer();
+      }
+    } catch {} finally {
+      setRefreshing(false);
     }
   };
 
@@ -157,13 +184,15 @@ export default function CustomerDetailPage() {
   const getSourceLabel = (source: string) => {
     switch (source) {
       case "capture":
-        return "智能录入";
+        return "📥 Capture";
       case "manual":
-        return "手动记录";
+        return "✏️ 手动";
       case "email":
-        return "邮件";
+        return "📧 邮件";
+      case "phone":
+        return "📞 电话";
       case "meeting":
-        return "会议";
+        return "📝 会议纪要";
     }
   };
 
@@ -175,9 +204,28 @@ export default function CustomerDetailPage() {
         return "bg-gray-500/10 text-gray-600";
       case "email":
         return "bg-blue-500/10 text-blue-600";
+      case "phone":
+        return "bg-green-500/10 text-green-600";
       case "meeting":
         return "bg-purple-500/10 text-purple-600";
     }
+  };
+
+  const getStageClass = (stage: string) => {
+    if (!stage) return "bg-gray-500/10 text-gray-600";
+    if (stage.includes("线索")) return "bg-blue-500/10 text-blue-600";
+    if (stage.includes("确认")) return "bg-green-500/10 text-green-600";
+    if (stage.includes("方案")) return "bg-purple-500/10 text-purple-600";
+    if (stage.includes("谈判")) return "bg-orange-500/10 text-orange-600";
+    if (stage.includes("成交")) return "bg-emerald-500/10 text-emerald-600";
+    if (stage.includes("流失")) return "bg-red-500/10 text-red-600";
+    return "bg-gray-500/10 text-gray-600";
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 80) return "text-emerald-600";
+    if (confidence >= 50) return "text-amber-600";
+    return "text-red-600";
   };
 
   const formatDate = (dateStr: string) => {
@@ -215,6 +263,22 @@ export default function CustomerDetailPage() {
     return text.substring(0, maxLength) + "...";
   };
 
+  const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "刚刚";
+    if (diffMins < 60) return `${diffMins}分钟前`;
+    if (diffHours < 24) return `${diffHours}小时前`;
+    if (diffDays < 7) return `${diffDays}天前`;
+    return formatDate(dateStr);
+  };
+
   const groupActivitiesByDate = () => {
     const groups: Record<string, Activity[]> = {};
     activities.forEach((activity) => {
@@ -247,6 +311,7 @@ export default function CustomerDetailPage() {
   }
 
   const activityGroups = groupActivitiesByDate();
+  const aiSummary = customer.ai_summary;
 
   return (
     <div className="py-8">
@@ -263,6 +328,106 @@ export default function CustomerDetailPage() {
           {getLevelLabel(customer.level)}
         </span>
       </div>
+
+      <div className="bg-gradient-to-br from-primary/5 via-card to-primary/5 rounded-2xl p-8 mb-8 border border-primary/10 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Brain className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Customer Brain</h2>
+              <p className="text-xs text-muted-foreground">AI 智能分析客户数据</p>
+            </div>
+          </div>
+          <button
+            onClick={refreshAISummary}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            <span>刷新</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">阶段</p>
+            <span className={`inline-flex px-3 py-2 text-sm font-medium rounded-xl ${getStageClass(aiSummary?.stage || "")}`}>
+              {aiSummary?.stage || "-"}
+            </span>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">预算</p>
+            <p className="text-xl font-semibold text-amber-600">{aiSummary?.budget || "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">决策人</p>
+            <p className="text-lg font-medium">{aiSummary?.decision_maker || "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">AI可信度</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all ${aiSummary?.confidence && aiSummary.confidence >= 80 ? "bg-emerald-500" : aiSummary?.confidence && aiSummary.confidence >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+                  style={{ width: `${aiSummary?.confidence || 0}%` }}
+                ></div>
+              </div>
+              <span className={`text-sm font-medium ${getConfidenceColor(aiSummary?.confidence || 0)}`}>
+                {aiSummary?.confidence || 0}%
+              </span>
+            </div>
+          </div>
+          {aiSummary?.risk && (
+            <div className="lg:col-span-4">
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                <span>风险提示</span>
+              </p>
+              <p className="text-sm text-orange-600 bg-orange-50/50 px-4 py-3 rounded-xl">
+                {aiSummary.risk}
+              </p>
+            </div>
+          )}
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">下一步</p>
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">{aiSummary?.next_action || "-"}</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">预计签约</p>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">{formatDate(aiSummary?.estimated_close_date || "") || "-"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {aiSummary?.last_activity_summary && (
+        <div className="bg-card rounded-xl shadow-sm p-6 mb-8 border border-primary/5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">AI 总结</span>
+            </div>
+            <button
+              onClick={refreshAISummary}
+              disabled={refreshing}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
+              <span>刷新</span>
+            </button>
+          </div>
+          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+            {aiSummary.last_activity_summary}
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-6">
@@ -350,7 +515,7 @@ export default function CustomerDetailPage() {
                       </div>
                       <div className="ml-14 space-y-4">
                         {dateActivities.map((activity) => (
-                          <div key={activity.id} className="bg-muted/30 rounded-xl p-4">
+                          <div key={activity.id} className="bg-muted/30 rounded-xl p-5">
                             <div className="flex items-center gap-2 mb-3">
                               <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSourceClass(activity.source)}`}>
                                 {getSourceLabel(activity.source)}

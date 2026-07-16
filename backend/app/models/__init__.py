@@ -2,6 +2,7 @@ from .customer import Customer, CustomerLevel, CustomerStatus
 from .activity import Activity, ActivitySource
 from .inbox import InboxItem, InboxStatus
 from .project import Project, ProjectStatus
+from .customer_ai_summary import CustomerAISummary
 
 __all__ = [
     "Customer",
@@ -13,4 +14,5 @@ __all__ = [
     "InboxStatus",
     "Project",
     "ProjectStatus",
+    "CustomerAISummary",
 ]

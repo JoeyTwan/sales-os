@@ -18,6 +18,17 @@ class CustomerStatus(str, Enum):
     LOST = "LOST"
 
 
+class CustomerAISummarySchema(BaseModel):
+    stage: Optional[str] = None
+    budget: Optional[str] = None
+    decision_maker: Optional[str] = None
+    risk: Optional[str] = None
+    next_action: Optional[str] = None
+    estimated_close_date: Optional[date] = None
+    confidence: Optional[int] = None
+    last_activity_summary: Optional[str] = None
+
+
 class CustomerBase(BaseModel):
     name: str = Field(..., max_length=255)
     level: CustomerLevel
@@ -46,6 +57,7 @@ class CustomerOut(CustomerBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    ai_summary: Optional[CustomerAISummarySchema] = None
 
     class Config:
         from_attributes = True

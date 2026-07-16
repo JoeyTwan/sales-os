@@ -309,6 +309,26 @@ def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session 
         )
         db.add(activity)
 
+        if customer_id:
+            from app.models.customer_ai_summary import CustomerAISummary
+            from .customer_ai_summary import AISummaryEngine
+            
+            db_customer = db.query(Customer).filter(Customer.id == customer_id).first()
+            if db_customer:
+                summary_data = AISummaryEngine.generate_summary(db, db_customer)
+                
+                summary = db.query(CustomerAISummary).filter(CustomerAISummary.customer_id == customer_id).first()
+                if summary:
+                    for key, value in summary_data.items():
+                        setattr(summary, key, value)
+                    summary.last_generated_at = datetime.now()
+                else:
+                    summary = CustomerAISummary(
+                        customer_id=customer_id,
+                        **summary_data
+                    )
+                    db.add(summary)
+
     if request.tasks:
         from app.models.task import Task
         for task in request.tasks:
