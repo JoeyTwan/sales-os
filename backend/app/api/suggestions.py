@@ -169,7 +169,7 @@ def update_suggestion(suggestion_id: str, request: SuggestionUpdate, db: Session
 
 
 @router.post("/{suggestion_id}/confirm")
-def confirm_suggestion(suggestion_id: str, db: Session = Depends(get_db)):
+def confirm_suggestion(suggestion_id: str, request: SuggestionJSON, db: Session = Depends(get_db)):
     suggestion = db.query(AISuggestion).filter(AISuggestion.id == suggestion_id).first()
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
@@ -177,32 +177,37 @@ def confirm_suggestion(suggestion_id: str, db: Session = Depends(get_db)):
     if suggestion.status != "PENDING":
         raise HTTPException(status_code=400, detail="Suggestion is not pending")
     
-    suggestion_json = suggestion.suggestion_json
-    if not suggestion_json:
-        raise HTTPException(status_code=400, detail="No suggestions to confirm")
-    
-    for customer_suggestion in suggestion_json.get("customer_suggestions", []):
+    for customer_suggestion in request.customer_suggestions:
+        next_action_date = None
+        if customer_suggestion.next_action_date:
+            next_action_date = datetime.fromisoformat(customer_suggestion.next_action_date).date()
+        
         db_customer = Customer(
-            name=customer_suggestion["name"],
-            level=CustomerLevel(customer_suggestion.get("level", "MEDIUM")),
-            status=CustomerStatus(customer_suggestion.get("status", "ACTIVE")),
-            summary=customer_suggestion.get("summary"),
-            next_action=customer_suggestion.get("next_action"),
-            next_action_date=customer_suggestion.get("next_action_date"),
+            name=customer_suggestion.name,
+            level=customer_suggestion.level,
+            status=customer_suggestion.status,
+            summary=customer_suggestion.summary,
+            next_action=customer_suggestion.next_action,
+            next_action_date=next_action_date,
         )
         db.add(db_customer)
     
-    for task_suggestion in suggestion_json.get("task_suggestions", []):
+    for task_suggestion in request.task_suggestions:
+        due_date = None
+        if task_suggestion.due_date:
+            due_date = datetime.fromisoformat(task_suggestion.due_date).date()
+        
         db_task = Task(
-            title=task_suggestion["title"],
-            description=task_suggestion.get("description"),
-            status=TaskStatus("TODO"),
-            priority=TaskPriority(task_suggestion.get("priority", "MEDIUM")),
-            due_date=task_suggestion.get("due_date"),
+            title=task_suggestion.title,
+            description=task_suggestion.description,
+            status="TODO",
+            priority=task_suggestion.priority,
+            due_date=due_date,
         )
         db.add(db_task)
     
     suggestion.status = "CONFIRMED"
+    suggestion.suggestion_json = request.model_dump()
     db.commit()
     
     return {"message": "Suggestions confirmed and created successfully"}
