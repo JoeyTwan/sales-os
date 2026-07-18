@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, X, UserPlus, ListTodo, Archive } from "lucide-react";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 
 interface InboxItem {
   id: string;
@@ -45,11 +46,8 @@ export default function InboxDetailPage() {
   const loadItem = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/inbox/${params.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setItem(data);
-      }
+      const data = await apiGet<InboxItem>(`/api/inbox/${params.id}`);
+      setItem(data);
     } catch {}
     setLoading(false);
   };
@@ -57,13 +55,7 @@ export default function InboxDetailPage() {
   const handleArchive = async () => {
     if (!item) return;
     try {
-      await fetch(`/api/inbox/${item.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "ARCHIVED" }),
-      });
+      await apiPatch(`/api/inbox/${item.id}`, { status: "ARCHIVED" });
       router.push("/inbox");
     } catch {}
   };
@@ -73,23 +65,17 @@ export default function InboxDetailPage() {
     if (!customerForm.name.trim()) return;
 
     try {
-      await fetch("/api/customers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: customerForm.name.trim(),
-          company: customerForm.company.trim() || null,
-          position: customerForm.position.trim() || null,
-          phone: customerForm.phone.trim() || null,
-          email: customerForm.email.trim() || null,
-          level: customerForm.level,
-          status: customerForm.status,
-          summary: customerForm.summary.trim() || null,
-          next_action: customerForm.next_action.trim() || null,
-          next_action_date: customerForm.next_action_date || null,
-        }),
+      await apiPost("/api/customers", {
+        name: customerForm.name.trim(),
+        company: customerForm.company.trim() || null,
+        position: customerForm.position.trim() || null,
+        phone: customerForm.phone.trim() || null,
+        email: customerForm.email.trim() || null,
+        level: customerForm.level,
+        status: customerForm.status,
+        summary: customerForm.summary.trim() || null,
+        next_action: customerForm.next_action.trim() || null,
+        next_action_date: customerForm.next_action_date || null,
       });
       await handleArchive();
     } catch {}
@@ -100,17 +86,11 @@ export default function InboxDetailPage() {
     if (!taskForm.title.trim()) return;
 
     try {
-      await fetch("/api/tasks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: taskForm.title.trim(),
-          description: taskForm.description.trim() || null,
-          priority: taskForm.priority,
-          due_date: taskForm.due_date || null,
-        }),
+      await apiPost("/api/tasks", {
+        title: taskForm.title.trim(),
+        description: taskForm.description.trim() || null,
+        priority: taskForm.priority,
+        due_date: taskForm.due_date || null,
       });
       await handleArchive();
     } catch {}
@@ -134,7 +114,7 @@ export default function InboxDetailPage() {
       case "CONFIRMED":
         return "bg-green-500/10 text-green-600";
       case "ARCHIVED":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 

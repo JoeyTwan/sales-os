@@ -14,6 +14,7 @@ class AISuggestion(Base):
     __tablename__ = "ai_suggestions"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=True)
     status = Column(SuggestionStatus, nullable=False, default="PENDING")
     raw_content = Column(String, nullable=False)
     suggestion_json = Column(JSON, nullable=True)

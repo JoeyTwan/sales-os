@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { X, CheckCircle, User, Folder, ListTodo, Calendar, FileText } from "lucide-react";
+import { apiGet, apiPost, apiPatch } from "@/lib/api";
 
 interface Activity {
   id: string;
@@ -70,6 +72,7 @@ interface AnalyzeResult {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -82,6 +85,11 @@ export default function DashboardPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
     textareaRef.current?.focus();
     loadActivities();
     loadTasks();
@@ -90,50 +98,41 @@ export default function DashboardPage() {
 
   const loadActivities = async () => {
     try {
-      const response = await fetch("/api/activities");
-      if (response.ok) {
-        const data = await response.json();
-        setActivities(data.slice(0, 10));
-      }
+      const data = await apiGet<Activity[]>("/api/activities");
+      setActivities(data.slice(0, 10));
     } catch {}
   };
 
   const loadTasks = async () => {
     try {
-      const response = await fetch("/api/tasks");
-      if (response.ok) {
-        const data = await response.json();
-        const today = new Date();
-        const sevenDaysLater = new Date();
-        sevenDaysLater.setDate(today.getDate() + 7);
-        const upcomingTasks = data.filter((task: Task) => {
-          if (!task.due_date) return false;
-          const dueDate = new Date(task.due_date);
-          return dueDate >= today && dueDate <= sevenDaysLater;
-        });
-        upcomingTasks.sort((a: Task, b: Task) => {
-          if (!a.due_date) return 1;
-          if (!b.due_date) return -1;
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-        });
-        setTasks(upcomingTasks);
-      }
+      const data = await apiGet<Task[]>("/api/tasks");
+      const today = new Date();
+      const sevenDaysLater = new Date();
+      sevenDaysLater.setDate(today.getDate() + 7);
+      const upcomingTasks = data.filter((task: Task) => {
+        if (!task.due_date) return false;
+        const dueDate = new Date(task.due_date);
+        return dueDate >= today && dueDate <= sevenDaysLater;
+      });
+      upcomingTasks.sort((a: Task, b: Task) => {
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
+      setTasks(upcomingTasks);
     } catch {}
   };
 
   const loadCustomers = async () => {
     try {
-      const response = await fetch("/api/customers");
-      if (response.ok) {
-        const data = await response.json();
-        const activeCustomers = data.filter((c: Customer) => c.status !== "LOST");
-        activeCustomers.sort((a: Customer, b: Customer) => {
-          const dateA = a.next_action_date ? new Date(a.next_action_date).getTime() : Infinity;
-          const dateB = b.next_action_date ? new Date(b.next_action_date).getTime() : Infinity;
-          return dateA - dateB;
-        });
-        setCustomers(activeCustomers.slice(0, 5));
-      }
+      const data = await apiGet<Customer[]>("/api/customers");
+      const activeCustomers = data.filter((c: Customer) => c.status !== "LOST");
+      activeCustomers.sort((a: Customer, b: Customer) => {
+        const dateA = a.next_action_date ? new Date(a.next_action_date).getTime() : Infinity;
+        const dateB = b.next_action_date ? new Date(b.next_action_date).getTime() : Infinity;
+        return dateA - dateB;
+      });
+      setCustomers(activeCustomers.slice(0, 5));
     } catch {}
   };
 
@@ -143,21 +142,11 @@ export default function DashboardPage() {
 
     setSending(true);
     try {
-      const response = await fetch("/api/suggestions/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content: content.trim() }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAnalyzeResult(data);
-        setContent("");
-        setShowModal(true);
-        textareaRef.current?.focus();
-      }
+      const data = await apiPost<AnalyzeResult>("/api/suggestions/analyze", { content: content.trim() });
+      setAnalyzeResult(data);
+      setContent("");
+      setShowModal(true);
+      textareaRef.current?.focus();
     } catch {} finally {
       setSending(false);
     }
@@ -178,13 +167,7 @@ export default function DashboardPage() {
         payload.tasks = analyzeResult.tasks;
       }
 
-      await fetch(`/api/suggestions/${analyzeResult.suggestion_id}/confirm`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      await apiPost(`/api/suggestions/${analyzeResult.suggestion_id}/confirm`, payload);
 
       setShowModal(false);
       setAnalyzeResult(null);
@@ -203,13 +186,7 @@ export default function DashboardPage() {
 
   const handleTaskStatusChange = async (taskId: string, newStatus: Task["status"]) => {
     try {
-      await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await apiPatch(`/api/tasks/${taskId}`, { status: newStatus });
       loadTasks();
     } catch {}
   };
@@ -264,7 +241,7 @@ export default function DashboardPage() {
       case "MEDIUM":
         return "bg-yellow-500/10 text-yellow-700";
       case "LOW":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 

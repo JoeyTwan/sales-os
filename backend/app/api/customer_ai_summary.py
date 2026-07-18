@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from datetime import datetime, date, timedelta
 from typing import Optional
 import re
@@ -10,6 +10,7 @@ from ..models.customer import Customer
 from ..models.customer_ai_summary import CustomerAISummary
 from ..models.project import Project
 from ..models.activity import Activity
+from ..models.task import Task
 from ..schemas.customer_ai_summary import CustomerAISummaryOut, CustomerAISummaryRefreshResponse
 
 router = APIRouter(prefix="/api/customers", tags=["customer_ai_summary"])
@@ -22,6 +23,7 @@ class AISummaryEngine:
         
         projects = db.query(Project).filter(Project.customer_id == customer.id).order_by(desc(Project.created_at)).all()
         activities = db.query(Activity).filter(Activity.customer_id == customer.id).order_by(desc(Activity.activity_date)).all()
+        tasks = db.query(Task).filter(Task.customer_id == customer.id).all()
         
         all_content = content
         last_activity_content = ""
@@ -39,6 +41,12 @@ class AISummaryEngine:
         confidence = AISummaryEngine._calculate_confidence(stage, budget, decision_maker, next_action)
         last_activity_summary = AISummaryEngine._generate_activity_summary(last_activity_content, customer.name)
         
+        total_tasks = len(tasks)
+        completed_tasks = len([t for t in tasks if t.status == "DONE"])
+        today = date.today()
+        overdue_tasks = len([t for t in tasks if t.status != "DONE" and t.due_date and t.due_date < today])
+        task_completion_rate = int((completed_tasks / total_tasks) * 100) if total_tasks > 0 else 0
+        
         return {
             "stage": stage,
             "budget": budget,
@@ -48,6 +56,10 @@ class AISummaryEngine:
             "estimated_close_date": estimated_close_date,
             "confidence": confidence,
             "last_activity_summary": last_activity_summary,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "overdue_tasks": overdue_tasks,
+            "task_completion_rate": task_completion_rate,
         }
     
     @staticmethod

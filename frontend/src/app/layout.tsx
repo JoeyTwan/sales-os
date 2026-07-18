@@ -1,7 +1,6 @@
 import "@/styles/globals.css";
 import type { Metadata } from "next";
-import Sidebar from "@/components/Sidebar";
-import { ThemeProvider } from "@/context/ThemeContext";
+import RootLayoutContent from "./RootLayoutContent";
 
 export const metadata: Metadata = {
   title: "Sales OS",
@@ -16,12 +15,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
-        <ThemeProvider>
-          <Sidebar />
-          <main className="ml-[220px] min-h-screen">
-            <div className="mx-auto px-6 md:px-8 lg:px-12 max-w-[1400px]">{children}</div>
-          </main>
-        </ThemeProvider>
+        <RootLayoutContent>{children}</RootLayoutContent>
       </body>
     </html>
   );

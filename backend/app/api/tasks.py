@@ -7,12 +7,14 @@ from typing import List
 from ..database import get_db
 from ..models.task import Task
 from ..schemas.task import TaskCreate, TaskUpdate, TaskOut
+from ..utils.auth import get_current_user
+from ..models.user import User
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
 @router.post("", response_model=TaskOut)
-def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_task = Task(**task.model_dump())
     db.add(db_task)
     db.commit()
@@ -21,13 +23,13 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=List[TaskOut])
-def get_tasks(db: Session = Depends(get_db)):
+def get_tasks(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     tasks = db.query(Task).order_by(desc(Task.due_date), desc(Task.created_at)).all()
     return tasks
 
 
 @router.get("/today", response_model=List[TaskOut])
-def get_today_tasks(db: Session = Depends(get_db)):
+def get_today_tasks(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     today = date.today()
     tasks = (
         db.query(Task)
@@ -38,8 +40,30 @@ def get_today_tasks(db: Session = Depends(get_db)):
     return tasks
 
 
+@router.get("/customer/{customer_id}", response_model=List[TaskOut])
+def get_customer_tasks(customer_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    tasks = (
+        db.query(Task)
+        .filter(Task.customer_id == customer_id)
+        .order_by(desc(Task.due_date), desc(Task.created_at))
+        .all()
+    )
+    return tasks
+
+
+@router.get("/project/{project_id}", response_model=List[TaskOut])
+def get_project_tasks(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    tasks = (
+        db.query(Task)
+        .filter(Task.project_id == project_id)
+        .order_by(desc(Task.due_date), desc(Task.created_at))
+        .all()
+    )
+    return tasks
+
+
 @router.patch("/{task_id}", response_model=TaskOut)
-def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depends(get_db)):
+def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

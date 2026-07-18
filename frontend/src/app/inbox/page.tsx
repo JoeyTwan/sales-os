@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowRight, UserPlus, ListTodo, Archive } from "lucide-react";
+import { apiGet, apiPatch } from "@/lib/api";
 
 interface InboxItem {
   id: string;
@@ -20,23 +21,14 @@ export default function InboxPage() {
 
   const loadItems = async () => {
     try {
-      const response = await fetch("/api/inbox");
-      if (response.ok) {
-        const data = await response.json();
-        setItems(data);
-      }
+      const data = await apiGet<InboxItem[]>("/api/inbox");
+      setItems(data);
     } catch {}
   };
 
   const handleArchive = async (id: string) => {
     try {
-      await fetch(`/api/inbox/${id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "ARCHIVED" }),
-      });
+      await apiPatch(`/api/inbox/${id}`, { status: "ARCHIVED" });
       loadItems();
     } catch {}
   };
@@ -59,7 +51,7 @@ export default function InboxPage() {
       case "CONFIRMED":
         return "bg-green-500/10 text-green-600";
       case "ARCHIVED":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 

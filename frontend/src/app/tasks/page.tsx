@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { List, Calendar, Plus, Check, X, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 
 interface Task {
   id: string;
@@ -42,37 +43,22 @@ export default function TasksPage() {
 
   const loadTasks = async () => {
     try {
-      const response = await fetch("/api/tasks");
-      if (response.ok) {
-        const data = await response.json();
-        setTasks(data);
-      }
+      const data = await apiGet<Task[]>("/api/tasks");
+      setTasks(data);
     } catch {}
   };
 
   const handleComplete = async (task: Task) => {
     const newStatus = task.status === "DONE" ? "TODO" : "DONE";
     try {
-      await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await apiPatch(`/api/tasks/${task.id}`, { status: newStatus });
       loadTasks();
     } catch {}
   };
 
   const handleStatusChange = async (task: Task, status: Task["status"]) => {
     try {
-      await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status }),
-      });
+      await apiPatch(`/api/tasks/${task.id}`, { status });
       loadTasks();
     } catch {}
   };
@@ -82,17 +68,11 @@ export default function TasksPage() {
     if (!newTask.title.trim()) return;
 
     try {
-      await fetch("/api/tasks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: newTask.title.trim(),
-          description: newTask.description.trim() || null,
-          priority: newTask.priority,
-          due_date: newTask.due_date || null,
-        }),
+      await apiPost("/api/tasks", {
+        title: newTask.title.trim(),
+        description: newTask.description.trim() || null,
+        priority: newTask.priority,
+        due_date: newTask.due_date || null,
       });
       setShowModal(false);
       setNewTask({ title: "", description: "", priority: "MEDIUM", due_date: "" });
@@ -144,7 +124,7 @@ export default function TasksPage() {
       case "MEDIUM":
         return "bg-yellow-500/10 text-yellow-700";
       case "LOW":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 
@@ -441,7 +421,7 @@ export default function TasksPage() {
           {grouped.future.length > 0 && (
             <div className="bg-card rounded-xl shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
-                <ChevronRight className="w-4 h-4 text-gray-500" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold text-muted-foreground">未来</h2>
                 <span className="text-xs text-muted-foreground ml-2">{grouped.future.length} 项</span>
               </div>

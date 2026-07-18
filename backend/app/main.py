@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import health_router, customers_router, activities_router, tasks_router, projects_router, inbox_router, suggestions_router, customer_ai_summary_router
+from .api import health_router, customers_router, activities_router, tasks_router, projects_router, inbox_router, suggestions_router, customer_ai_summary_router, auth_router
 from .database import engine, Base
 
 
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(customers_router)
 app.include_router(customer_ai_summary_router)
 app.include_router(activities_router)

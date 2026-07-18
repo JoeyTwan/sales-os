@@ -7,6 +7,8 @@ from typing import List, Optional
 
 from ..database import get_db
 from ..models.activity import Activity
+from ..utils.auth import get_current_user
+from ..models.user import User
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
 
@@ -38,7 +40,7 @@ class ActivitySummary(BaseModel):
 
 
 @router.post("/raw")
-def create_raw_activity(request: RawActivityRequest, db: Session = Depends(get_db)):
+def create_raw_activity(request: RawActivityRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     activity = Activity(
         customer_id=None,
         project_id=None,
@@ -53,7 +55,7 @@ def create_raw_activity(request: RawActivityRequest, db: Session = Depends(get_d
 
 
 @router.post("/customer")
-def create_activity_for_customer(request: ActivityForCustomerRequest, db: Session = Depends(get_db)):
+def create_activity_for_customer(request: ActivityForCustomerRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     activity = Activity(
         customer_id=request.customer_id,
         project_id=None,
@@ -68,7 +70,7 @@ def create_activity_for_customer(request: ActivityForCustomerRequest, db: Sessio
 
 
 @router.post("")
-def create_activity(request: ActivityCreateRequest, db: Session = Depends(get_db)):
+def create_activity(request: ActivityCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     activity = Activity(
         customer_id=request.customer_id,
         project_id=request.project_id,
@@ -83,7 +85,7 @@ def create_activity(request: ActivityCreateRequest, db: Session = Depends(get_db
 
 
 @router.get("", response_model=List[ActivitySummary])
-def get_recent_activities(db: Session = Depends(get_db)):
+def get_recent_activities(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     activities = (
         db.query(Activity)
         .order_by(desc(Activity.activity_date), desc(Activity.created_at))
@@ -94,7 +96,7 @@ def get_recent_activities(db: Session = Depends(get_db)):
 
 
 @router.get("/customer/{customer_id}", response_model=List[ActivitySummary])
-def get_customer_activities(customer_id: str, db: Session = Depends(get_db)):
+def get_customer_activities(customer_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     activities = (
         db.query(Activity)
         .filter(Activity.customer_id == customer_id)

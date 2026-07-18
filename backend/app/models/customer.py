@@ -13,6 +13,7 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=True)
     name = Column(String(255), nullable=False)
     level = Column(CustomerLevel, nullable=False)
     status = Column(CustomerStatus, nullable=False)

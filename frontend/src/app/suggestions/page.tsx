@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowRight, Sparkles, CheckCircle, XCircle, Clock } from "lucide-react";
+import { apiGet } from "@/lib/api";
 
 interface CustomerSuggestion {
   name: string;
@@ -41,11 +42,8 @@ export default function SuggestionsPage() {
   const loadSuggestions = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/suggestions");
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestions(data);
-      }
+      const data = await apiGet<Suggestion[]>("/api/suggestions");
+      setSuggestions(data);
     } catch {}
     setLoading(false);
   };
@@ -68,7 +66,7 @@ export default function SuggestionsPage() {
       case "CONFIRMED":
         return "bg-green-500/10 text-green-600";
       case "CANCELLED":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 
@@ -189,7 +187,7 @@ export default function SuggestionsPage() {
       {cancelledSuggestions.length > 0 && (
         <div className="mb-8">
           <h2 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-            <XCircle className="w-4 h-4 text-gray-500" />
+            <XCircle className="w-4 h-4 text-muted-foreground" />
             <span>已取消</span>
           </h2>
           <div className="space-y-4">

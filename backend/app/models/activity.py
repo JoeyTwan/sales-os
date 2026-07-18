@@ -12,6 +12,7 @@ class Activity(Base):
     __tablename__ = "activities"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=True)
     customer_id = Column(String(36), ForeignKey("customers.id", ondelete="CASCADE"), nullable=True)
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
     content = Column(Text, nullable=False)

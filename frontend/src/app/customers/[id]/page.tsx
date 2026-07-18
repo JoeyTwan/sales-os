@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, User, Folder, FileText, Calendar, Clock, Target, DollarSign, Users, Zap, TrendingUp, AlertTriangle, RefreshCw, Brain } from "lucide-react";
+import { apiGet, apiPost } from "@/lib/api";
 
 interface Customer {
   id: string;
@@ -26,6 +27,10 @@ interface CustomerAISummary {
   estimated_close_date: string;
   confidence: number;
   last_activity_summary: string;
+  total_tasks: number;
+  completed_tasks: number;
+  overdue_tasks: number;
+  task_completion_rate: number;
 }
 
 interface Project {
@@ -49,11 +54,25 @@ interface Activity {
   created_at: string;
 }
 
+interface Task {
+  id: string;
+  customer_id: string | null;
+  project_id: string | null;
+  title: string;
+  description: string | null;
+  status: "TODO" | "DOING" | "DONE";
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  due_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -61,52 +80,56 @@ export default function CustomerDetailPage() {
     loadCustomer();
     loadProjects();
     loadActivities();
+    loadTasks();
   }, [id]);
 
   const loadCustomer = async () => {
     try {
-      const response = await fetch(`/api/customers/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCustomer(data);
-      }
+      const data = await apiGet<Customer>(`/api/customers/${id}`);
+      setCustomer(data);
     } catch {}
   };
 
   const loadProjects = async () => {
     try {
-      const response = await fetch(`/api/projects/customer/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setProjects(data);
-      }
+      const data = await apiGet<Project[]>(`/api/projects/customer/${id}`);
+      const projectsWithTaskCount = await Promise.all(
+        data.map(async (project: Project) => {
+          try {
+            const tasksData = await apiGet<Task[]>(`/api/tasks/project/${project.id}`);
+            return { ...project, task_count: tasksData.length };
+          } catch {}
+          return { ...project, task_count: 0 };
+        })
+      );
+      setProjects(projectsWithTaskCount);
     } catch {}
   };
 
   const loadActivities = async () => {
     try {
-      const response = await fetch(`/api/activities/customer/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        data.sort((a: Activity, b: Activity) => 
-          new Date(b.activity_date).getTime() - new Date(a.activity_date).getTime()
-        );
-        setActivities(data);
-      }
+      const data = await apiGet<Activity[]>(`/api/activities/customer/${id}`);
+      data.sort((a: Activity, b: Activity) => 
+        new Date(b.activity_date).getTime() - new Date(a.activity_date).getTime()
+      );
+      setActivities(data);
     } catch {} finally {
       setLoading(false);
     }
   };
 
+  const loadTasks = async () => {
+    try {
+      const data = await apiGet<Task[]>(`/api/tasks/customer/${id}`);
+      setTasks(data);
+    } catch {}
+  };
+
   const refreshAISummary = async () => {
     setRefreshing(true);
     try {
-      const response = await fetch(`/api/customers/${id}/ai-summary/refresh`, {
-        method: "POST",
-      });
-      if (response.ok) {
-        await loadCustomer();
-      }
+      await apiPost(`/api/customers/${id}/ai-summary/refresh`, {});
+      await loadCustomer();
     } catch {} finally {
       setRefreshing(false);
     }
@@ -119,7 +142,7 @@ export default function CustomerDetailPage() {
       case "MEDIUM":
         return "bg-yellow-500/10 text-yellow-700";
       case "LOW":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 
@@ -201,7 +224,7 @@ export default function CustomerDetailPage() {
       case "capture":
         return "bg-primary/10 text-primary";
       case "manual":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
       case "email":
         return "bg-blue-500/10 text-blue-600";
       case "phone":
@@ -212,14 +235,58 @@ export default function CustomerDetailPage() {
   };
 
   const getStageClass = (stage: string) => {
-    if (!stage) return "bg-gray-500/10 text-gray-600";
+    if (!stage) return "bg-muted/50 text-muted-foreground";
     if (stage.includes("线索")) return "bg-blue-500/10 text-blue-600";
     if (stage.includes("确认")) return "bg-green-500/10 text-green-600";
     if (stage.includes("方案")) return "bg-purple-500/10 text-purple-600";
     if (stage.includes("谈判")) return "bg-orange-500/10 text-orange-600";
     if (stage.includes("成交")) return "bg-emerald-500/10 text-emerald-600";
     if (stage.includes("流失")) return "bg-red-500/10 text-red-600";
-    return "bg-gray-500/10 text-gray-600";
+    return "bg-muted/50 text-muted-foreground";
+  };
+
+  const getTaskStatusLabel = (status: string) => {
+    switch (status) {
+      case "TODO":
+        return "待办";
+      case "DOING":
+        return "进行中";
+      case "DONE":
+        return "已完成";
+    }
+  };
+
+  const getTaskStatusClass = (status: string) => {
+    switch (status) {
+      case "TODO":
+        return "bg-muted/50 text-muted-foreground";
+      case "DOING":
+        return "bg-blue-500/10 text-blue-600";
+      case "DONE":
+        return "bg-green-500/10 text-green-600";
+    }
+  };
+
+  const getTaskPriorityClass = (priority: string) => {
+    switch (priority) {
+      case "HIGH":
+        return "bg-red-500/10 text-red-600";
+      case "MEDIUM":
+        return "bg-yellow-500/10 text-yellow-700";
+      case "LOW":
+        return "bg-muted/50 text-muted-foreground";
+    }
+  };
+
+  const getTaskPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case "HIGH":
+        return "高";
+      case "MEDIUM":
+        return "中";
+      case "LOW":
+        return "低";
+    }
   };
 
   const getConfidenceColor = (confidence: number) => {
@@ -404,6 +471,34 @@ export default function CustomerDetailPage() {
               <span className="text-sm font-medium">{formatDate(aiSummary?.estimated_close_date || "") || "-"}</span>
             </div>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">任务进度</p>
+            <div>
+              <p className="text-lg font-semibold">
+                {aiSummary?.completed_tasks || 0}/{aiSummary?.total_tasks || 0}
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${aiSummary?.task_completion_rate || 0}%` }}
+                  ></div>
+                </div>
+                <span className="text-sm font-medium text-primary">
+                  {aiSummary?.task_completion_rate || 0}%
+                </span>
+              </div>
+            </div>
+          </div>
+          {aiSummary?.overdue_tasks && aiSummary.overdue_tasks > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">逾期任务</p>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+                <span className="text-lg font-semibold text-red-600">{aiSummary.overdue_tasks}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -479,9 +574,14 @@ export default function CustomerDetailPage() {
                         {getProjectStatusLabel(project.status)}
                       </span>
                     </div>
-                    {project.budget && (
-                      <p className="text-xs text-amber-600">预算: {formatBudget(project.budget)}</p>
-                    )}
+                    <div className="flex items-center gap-4">
+                      {project.budget && (
+                        <p className="text-xs text-amber-600">预算: {formatBudget(project.budget)}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        任务: {(project as any).task_count || 0}
+                      </p>
+                    </div>
                     {project.description && (
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{truncateContent(project.description, 50)}</p>
                     )}
@@ -494,7 +594,44 @@ export default function CustomerDetailPage() {
           </div>
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-card rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-6">
+              <Target className="w-4 h-4" />
+              <span>任务列表</span>
+            </div>
+            {tasks.length > 0 ? (
+              <div className="space-y-3">
+                {tasks.map((task) => (
+                  <div key={task.id} className="p-4 rounded-xl bg-muted/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium">{task.title}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getTaskStatusClass(task.status)}`}>
+                          {getTaskStatusLabel(task.status)}
+                        </span>
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getTaskPriorityClass(task.priority)}`}>
+                          {getTaskPriorityLabel(task.priority)}
+                        </span>
+                      </div>
+                    </div>
+                    {task.due_date && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
+                        <span>{formatDate(task.due_date)}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Target className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">暂无任务</p>
+              </div>
+            )}
+          </div>
+
           <div className="bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-6">
               <Clock className="w-4 h-4" />

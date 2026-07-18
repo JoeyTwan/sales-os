@@ -1,14 +1,19 @@
 import re
 from datetime import datetime, timedelta
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
 from app.database import get_db
 from app.models.suggestion import AISuggestion
 from app.models.customer import Customer
+from app.schemas.suggestion import SuggestionOut, SuggestionUpdate
+from ..utils.auth import get_current_user
+from ..models.user import User
 
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
 
@@ -218,20 +223,28 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
-def analyze_content(request: AnalyzeRequest = Body(...), db: Session = Depends(get_db)):
+def analyze_content(request: AnalyzeRequest = Body(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from app.services.ai_service import analyze_sales_note
+
     content = request.content
-    analysis = MockAIEngine.analyze(content)
+    analysis = analyze_sales_note(content)
+
+    customers = [analysis.get("customer")] if analysis.get("customer") else []
+    contacts = [analysis.get("contact")] if analysis.get("contact") else []
+    projects = [analysis.get("project")] if analysis.get("project") else []
+    tasks = [analysis.get("task")] if analysis.get("task") else []
 
     matched_customer = None
-    if analysis["customers"]:
-        customer_name = analysis["customers"][0]["name"]
-        db_customer = db.query(Customer).filter(Customer.name == customer_name).first()
-        if db_customer:
-            matched_customer = {
-                "id": db_customer.id,
-                "name": db_customer.name,
-                "confidence": 1.0,
-            }
+    if customers:
+        customer_name = customers[0].get("name")
+        if customer_name:
+            db_customer = db.query(Customer).filter(Customer.name == customer_name).first()
+            if db_customer:
+                matched_customer = {
+                    "id": db_customer.id,
+                    "name": db_customer.name,
+                    "confidence": 1.0,
+                }
 
     db_suggestion = AISuggestion(
         raw_content=content,
@@ -245,15 +258,15 @@ def analyze_content(request: AnalyzeRequest = Body(...), db: Session = Depends(g
         "suggestion_id": db_suggestion.id,
         "raw_content": content,
         "matched_customer": matched_customer,
-        "customers": analysis["customers"],
-        "contacts": analysis["contacts"],
-        "projects": analysis["projects"],
-        "tasks": analysis["tasks"],
+        "customers": customers,
+        "contacts": contacts,
+        "projects": projects,
+        "tasks": tasks,
     }
 
 
 @router.post("/{suggestion_id}/confirm")
-def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session = Depends(get_db)):
+def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     suggestion = db.query(AISuggestion).filter(AISuggestion.id == suggestion_id).first()
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
@@ -277,6 +290,7 @@ def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session 
                 level=request.customer.level,
                 status=request.customer.status,
                 summary=request.customer.summary,
+                user_id=current_user.id,
             )
             db.add(new_customer)
             db.commit()
@@ -292,6 +306,7 @@ def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session 
             description=request.project.description,
             budget=request.project.budget,
             status=request.project.status,
+            user_id=current_user.id,
         )
         db.add(new_project)
         db.commit()
@@ -306,6 +321,7 @@ def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session 
             source="capture",
             content=suggestion.raw_content,
             activity_date=datetime.now().date(),
+            user_id=current_user.id,
         )
         db.add(activity)
 
@@ -341,6 +357,9 @@ def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session 
                 status="TODO",
                 priority=task.priority,
                 due_date=due_date,
+                user_id=current_user.id,
+                customer_id=customer_id,
+                project_id=project_id,
             )
             db.add(new_task)
 
@@ -348,3 +367,28 @@ def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session 
     db.commit()
 
     return {"message": "Suggestions confirmed and created successfully"}
+
+
+@router.get("", response_model=List[SuggestionOut])
+def get_suggestions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    suggestions = db.query(AISuggestion).order_by(desc(AISuggestion.created_at)).all()
+    return suggestions
+
+
+@router.get("/{suggestion_id}", response_model=SuggestionOut)
+def get_suggestion(suggestion_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    suggestion = db.query(AISuggestion).filter(AISuggestion.id == suggestion_id).first()
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    return suggestion
+
+
+@router.patch("/{suggestion_id}", response_model=SuggestionOut)
+def update_suggestion(suggestion_id: str, request: SuggestionUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    suggestion = db.query(AISuggestion).filter(AISuggestion.id == suggestion_id).first()
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    suggestion.status = request.status.value
+    db.commit()
+    db.refresh(suggestion)
+    return suggestion

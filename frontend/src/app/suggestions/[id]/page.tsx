@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, X, UserPlus, ListTodo, CheckCircle, Edit3, Trash2 } from "lucide-react";
+import { apiGet, apiPost, apiPatch } from "@/lib/api";
 
 interface CustomerSuggestion {
   id?: string;
@@ -54,13 +55,10 @@ export default function SuggestionDetailPage() {
   const loadSuggestion = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/suggestions/${params.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestion(data);
-        setCustomerSuggestions(data.suggestion_json?.customer_suggestions || []);
-        setTaskSuggestions(data.suggestion_json?.task_suggestions || []);
-      }
+      const data = await apiGet<Suggestion>(`/api/suggestions/${params.id}`);
+      setSuggestion(data);
+      setCustomerSuggestions(data.suggestion_json?.customer_suggestions || []);
+      setTaskSuggestions(data.suggestion_json?.task_suggestions || []);
     } catch {}
     setLoading(false);
   };
@@ -69,12 +67,7 @@ export default function SuggestionDetailPage() {
     if (!suggestion) return;
     setConfirming(true);
     try {
-      await fetch(`/api/suggestions/${suggestion.id}/confirm`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      await apiPost(`/api/suggestions/${suggestion.id}/confirm`, {});
       router.push("/suggestions");
     } catch {}
     setConfirming(false);
@@ -83,13 +76,7 @@ export default function SuggestionDetailPage() {
   const handleCancel = async () => {
     if (!suggestion) return;
     try {
-      await fetch(`/api/suggestions/${suggestion.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "CANCELLED" }),
-      });
+      await apiPatch(`/api/suggestions/${suggestion.id}`, { status: "CANCELLED" });
       router.push("/suggestions");
     } catch {}
   };
@@ -136,7 +123,7 @@ export default function SuggestionDetailPage() {
       case "CONFIRMED":
         return "bg-green-500/10 text-green-600";
       case "CANCELLED":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 
@@ -147,7 +134,7 @@ export default function SuggestionDetailPage() {
       case "MEDIUM":
         return "bg-yellow-500/10 text-yellow-700";
       case "LOW":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 
@@ -439,7 +426,7 @@ export default function SuggestionDetailPage() {
             </button>
             <button
               onClick={handleCancel}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-500/10 text-gray-600 rounded-lg hover:bg-gray-500/20 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-muted-foreground rounded-lg hover:bg-muted transition-colors"
             >
               <X className="w-4 h-4" />
               <span>取消</span>

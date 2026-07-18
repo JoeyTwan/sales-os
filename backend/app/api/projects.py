@@ -6,12 +6,14 @@ from typing import List
 from ..database import get_db
 from ..models.project import Project
 from ..schemas.project import ProjectCreate, ProjectOut, ProjectStatus
+from ..utils.auth import get_current_user
+from ..models.user import User
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 @router.post("", response_model=ProjectOut)
-def create_project(request: ProjectCreate, db: Session = Depends(get_db)):
+def create_project(request: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     project = Project(
         customer_id=str(request.customer_id),
         name=request.name,
@@ -26,7 +28,7 @@ def create_project(request: ProjectCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=List[ProjectOut])
-def get_projects(status: str = None, db: Session = Depends(get_db)):
+def get_projects(status: str = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     query = db.query(Project)
     if status:
         query = query.filter(Project.status == status)
@@ -35,7 +37,7 @@ def get_projects(status: str = None, db: Session = Depends(get_db)):
 
 
 @router.get("/{project_id}", response_model=ProjectOut)
-def get_project(project_id: str, db: Session = Depends(get_db)):
+def get_project(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -43,7 +45,7 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/customer/{customer_id}", response_model=List[ProjectOut])
-def get_customer_projects(customer_id: str, db: Session = Depends(get_db)):
+def get_customer_projects(customer_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     projects = (
         db.query(Project)
         .filter(Project.customer_id == customer_id)
@@ -54,7 +56,7 @@ def get_customer_projects(customer_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
-def update_project(project_id: str, request: ProjectCreate, db: Session = Depends(get_db)):
+def update_project(project_id: str, request: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -69,7 +71,7 @@ def update_project(project_id: str, request: ProjectCreate, db: Session = Depend
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: str, db: Session = Depends(get_db)):
+def delete_project(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

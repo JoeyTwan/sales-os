@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { TrendingUp, DollarSign, Calendar, AlertTriangle, Clock } from "lucide-react";
+import { apiGet } from "@/lib/api";
 
 interface CustomerAISummary {
   stage: string;
@@ -38,11 +39,8 @@ export default function CustomersPage() {
 
   const loadCustomers = async () => {
     try {
-      const response = await fetch("/api/customers");
-      if (response.ok) {
-        const data = await response.json();
-        setCustomers(data);
-      }
+      const data = await apiGet<Customer[]>("/api/customers");
+      setCustomers(data);
     } catch {} finally {
       setLoading(false);
     }
@@ -55,7 +53,7 @@ export default function CustomersPage() {
       case "MEDIUM":
         return "bg-yellow-500/10 text-yellow-700";
       case "LOW":
-        return "bg-gray-500/10 text-gray-600";
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 
@@ -84,14 +82,14 @@ export default function CustomersPage() {
   };
 
   const getStageClass = (stage: string) => {
-    if (!stage) return "bg-gray-500/10 text-gray-600";
+    if (!stage) return "bg-muted/50 text-muted-foreground";
     if (stage.includes("线索")) return "bg-blue-500/10 text-blue-600";
     if (stage.includes("确认")) return "bg-green-500/10 text-green-600";
     if (stage.includes("方案")) return "bg-purple-500/10 text-purple-600";
     if (stage.includes("谈判")) return "bg-orange-500/10 text-orange-600";
     if (stage.includes("成交")) return "bg-emerald-500/10 text-emerald-600";
     if (stage.includes("流失")) return "bg-red-500/10 text-red-600";
-    return "bg-gray-500/10 text-gray-600";
+    return "bg-muted/50 text-muted-foreground";
   };
 
   const formatDate = (dateStr: string) => {

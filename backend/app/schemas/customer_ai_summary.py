@@ -13,6 +13,10 @@ class CustomerAISummaryBase(BaseModel):
     estimated_close_date: Optional[date] = None
     confidence: Optional[int] = None
     last_activity_summary: Optional[str] = None
+    total_tasks: Optional[int] = None
+    completed_tasks: Optional[int] = None
+    overdue_tasks: Optional[int] = None
+    task_completion_rate: Optional[int] = None
 
 
 class CustomerAISummaryOut(CustomerAISummaryBase):
