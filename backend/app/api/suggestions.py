@@ -222,6 +222,7 @@ class MockAIEngine:
 
 class AnalyzeRequest(BaseModel):
     content: str = Field(..., description="用户输入内容")
+    mode: Optional[str] = Field("ai_assistant", description="分析模式")
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
