@@ -56,6 +56,7 @@ class MatchedCustomer(BaseModel):
 class AnalyzeResponse(BaseModel):
     suggestion_id: str
     raw_content: str
+    activity_content: Optional[str] = None
     matched_customer: Optional[MatchedCustomer] = None
     customers: List[CustomerSuggestion] = []
     contacts: List[ContactSuggestion] = []
@@ -257,9 +258,12 @@ def analyze_content(request: AnalyzeRequest = Body(...), db: Session = Depends(g
     db.commit()
     db.refresh(db_suggestion)
 
+    activity_content = analysis.get("activity", {}).get("content") if analysis.get("activity") else None
+    
     return {
         "suggestion_id": db_suggestion.id,
         "raw_content": content,
+        "activity_content": activity_content,
         "matched_customer": matched_customer,
         "customers": customers,
         "contacts": contacts,

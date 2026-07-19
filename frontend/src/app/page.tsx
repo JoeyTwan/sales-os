@@ -87,6 +87,7 @@ interface MatchedCustomer {
 interface AnalyzeResult {
   suggestion_id: string;
   raw_content: string;
+  activity_content: string | null;
   matched_customer: MatchedCustomer | null;
   customers: CustomerSuggestion[];
   contacts: any[];
@@ -119,6 +120,7 @@ export default function DashboardPage() {
   const [showTaskMenu, setShowTaskMenu] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editableCustomer, setEditableCustomer] = useState<CustomerSuggestion | null>(null);
+  const [editableContact, setEditableContact] = useState<{ name: string; position: string } | null>(null);
   const [editableProject, setEditableProject] = useState<ProjectSuggestion | null>(null);
   const [editableTasks, setEditableTasks] = useState<TaskSuggestion[]>([]);
   const [editableActivity, setEditableActivity] = useState("");
@@ -197,6 +199,13 @@ export default function DashboardPage() {
         setEditableCustomer(null);
       }
       
+      if (data.contacts.length > 0) {
+        const contact = data.contacts[0];
+        setEditableContact({ name: contact.name || "", position: contact.position || "" });
+      } else {
+        setEditableContact(null);
+      }
+      
       if (data.projects.length > 0) {
         setEditableProject({ ...data.projects[0] });
       } else {
@@ -204,7 +213,7 @@ export default function DashboardPage() {
       }
       
       setEditableTasks(data.tasks.map(t => ({ ...t })));
-      setEditableActivity(data.raw_content);
+      setEditableActivity(data.activity_content || data.raw_content);
       
       setContent("");
       setShowModal(true);
@@ -240,6 +249,7 @@ export default function DashboardPage() {
       setShowModal(false);
       setAnalyzeResult(null);
       setEditableCustomer(null);
+      setEditableContact(null);
       setEditableProject(null);
       setEditableTasks([]);
       setEditableActivity("");
@@ -254,6 +264,7 @@ export default function DashboardPage() {
     setShowModal(false);
     setAnalyzeResult(null);
     setEditableCustomer(null);
+    setEditableContact(null);
     setEditableProject(null);
     setEditableTasks([]);
     setEditableActivity("");
@@ -822,20 +833,40 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {editableCustomer && (
+              {(editableCustomer || editableContact) && (
                 <div className="bg-muted/30 rounded-xl p-5">
                   <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
                     <User className="w-4 h-4" />
                     <span>已识别客户</span>
                   </div>
                   <div className="space-y-3">
-                    <input
-                      type="text"
-                      value={editableCustomer.name}
-                      onChange={(e) => setEditableCustomer({ ...editableCustomer, name: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-medium"
-                      placeholder="公司名称"
-                    />
+                    {editableCustomer && (
+                      <input
+                        type="text"
+                        value={editableCustomer.name}
+                        onChange={(e) => setEditableCustomer({ ...editableCustomer, name: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-medium"
+                        placeholder="公司名称"
+                      />
+                    )}
+                    {editableContact && (
+                      <>
+                        <input
+                          type="text"
+                          value={editableContact.name}
+                          onChange={(e) => setEditableContact({ ...editableContact, name: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                          placeholder="联系人姓名"
+                        />
+                        <input
+                          type="text"
+                          value={editableContact.position}
+                          onChange={(e) => setEditableContact({ ...editableContact, position: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                          placeholder="职位"
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               )}
