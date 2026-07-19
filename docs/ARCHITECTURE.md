@@ -1,246 +1,278 @@
-# Sales OS 架构文档
+# Sales OS 系统架构文档
 
-## 1. 系统概览
-
-Sales OS 是一个现代化的销售操作系统，采用前后端分离架构。
-
-### 技术栈
-
-| 层级 | 技术 | 版本 |
-|------|------|------|
-| 前端框架 | Next.js | 14.2.15 |
-| 前端语言 | TypeScript | 5.6.0 |
-| 前端样式 | Tailwind CSS | 3.4.14 |
-| 状态管理 | React Context | - |
-| 后端框架 | FastAPI | 0.115.0 |
-| 后端语言 | Python | 3.10+ |
-| 数据库 | SQLite | - |
-| ORM | SQLAlchemy | 2.0.35 |
-| 数据验证 | Pydantic | 2.9.0 |
-
-## 2. 架构图
+## 一、系统架构图
 
 ```mermaid
-graph TB
-    subgraph 前端层
-        A[Next.js App] --> B[API层 /api]
-        A --> C[页面组件]
-        A --> D[共享组件]
-        A --> E[Context状态管理]
+graph TD
+    subgraph 前端 Frontend
+        A[Next.js App Router]
+        B[React Components]
+        C[Tailwind CSS]
+        D[Lucide Icons]
+        E[Axios API]
     end
 
-    subgraph 后端层
-        F[FastAPI] --> G[路由层]
-        G --> H[业务逻辑层]
-        H --> I[数据访问层]
-        I --> J[(SQLite数据库)]
+    subgraph 后端 Backend
+        F[FastAPI]
+        G[SQLAlchemy ORM]
+        H[SQLite Database]
+        I[AI Service]
+        J[Authentication]
     end
 
-    B --> F
+    A --> F
+    B --> A
+    C --> B
+    D --> B
+    E --> F
+    F --> G
+    G --> H
+    F --> I
+    F --> J
 ```
 
-## 3. 数据库 ER 图
+## 二、数据库 ER 图
 
 ```mermaid
 erDiagram
-    customers ||--o{ activities : has
+    users ||--o{ customers : owns
+    users ||--o{ contacts : owns
+    users ||--o{ projects : owns
+    users ||--o{ tasks : owns
+    users ||--o{ activities : owns
+    users ||--o{ ai_suggestions : owns
+    
+    customers ||--o{ contacts : has
     customers ||--o{ projects : has
-    customers ||--o{ customer_ai_summary : has
-    projects ||--o{ activities : belongs_to
+    customers ||--o{ activities : has
+    customers ||--o{ tasks : has
+    customers ||--|| customer_ai_summary : has
     
+    projects ||--o{ activities : has
+    projects ||--o{ tasks : has
+
+    users {
+        VARCHAR(36) id PK
+        VARCHAR(255) email UK
+        VARCHAR(255) password_hash
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
     customers {
-        string id PK "主键(UUID)"
-        string name "客户名称"
-        enum level "等级(HIGH/MEDIUM/LOW)"
-        enum status "状态(ACTIVE/FOLLOWING/PAUSED/LOST)"
-        text summary "摘要"
-        text next_action "下一步动作"
-        date next_action_date "下一步动作日期"
-        date last_activity_date "最后活动日期"
-        timestamp created_at "创建时间"
-        timestamp updated_at "更新时间"
+        VARCHAR(36) id PK
+        VARCHAR(36) user_id FK
+        VARCHAR(255) name
+        VARCHAR(6) level
+        VARCHAR(9) status
+        TEXT summary
+        TEXT next_action
+        DATE next_action_date
+        DATE last_activity_date
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-    
-    activities {
-        string id PK "主键(UUID)"
-        string customer_id FK "客户ID"
-        string project_id FK "项目ID"
-        text content "活动内容"
-        enum source "来源(capture/manual/email/meeting)"
-        date activity_date "活动日期"
-        timestamp created_at "创建时间"
+
+    contacts {
+        TEXT id PK
+        TEXT user_id
+        TEXT customer_id FK
+        TEXT name
+        TEXT position
+        TEXT phone
+        TEXT email
+        TEXT remark
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-    
+
     projects {
-        string id PK "主键(UUID)"
-        string customer_id FK "客户ID"
-        string name "项目名称"
-        text description "项目描述"
-        integer budget "预算"
-        enum status "状态(LEAD/QUALIFIED/PROPOSAL/NEGOTIATION/WON/LOST)"
-        timestamp created_at "创建时间"
-        timestamp updated_at "更新时间"
+        VARCHAR(36) id PK
+        VARCHAR(36) customer_id FK
+        VARCHAR(36) user_id
+        VARCHAR(255) name
+        TEXT description
+        INTEGER budget
+        VARCHAR(11) status
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-    
+
     tasks {
-        string id PK "主键(UUID)"
-        string title "任务标题"
-        text description "任务描述"
-        enum status "状态(TODO/DOING/DONE)"
-        enum priority "优先级(HIGH/MEDIUM/LOW)"
-        date due_date "截止日期"
-        timestamp created_at "创建时间"
-        timestamp updated_at "更新时间"
+        VARCHAR(36) id PK
+        VARCHAR(36) customer_id FK
+        VARCHAR(36) project_id FK
+        VARCHAR(36) user_id
+        VARCHAR(255) title
+        TEXT description
+        VARCHAR(5) status
+        VARCHAR(6) priority
+        DATE due_date
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
-    
-    inbox_items {
-        uuid id PK "主键(UUID)"
-        string content "内容"
-        enum status "状态(PENDING/CONFIRMED/ARCHIVED)"
-        datetime created_at "创建时间"
+
+    activities {
+        VARCHAR(36) id PK
+        VARCHAR(36) customer_id FK
+        VARCHAR(36) project_id FK
+        VARCHAR(36) user_id
+        TEXT content
+        VARCHAR(7) source
+        DATE activity_date
+        TIMESTAMP created_at
     }
-    
+
     ai_suggestions {
-        string id PK "主键(UUID)"
-        enum status "状态(PENDING/CONFIRMED/CANCELLED)"
-        string raw_content "原始内容"
-        json suggestion_json "建议JSON"
-        datetime created_at "创建时间"
+        VARCHAR(36) id PK
+        VARCHAR(36) user_id
+        VARCHAR(9) status
+        VARCHAR raw_content
+        JSON suggestion_json
+        DATETIME created_at
     }
-    
+
     customer_ai_summary {
-        string id PK "主键(UUID)"
-        string customer_id FK "客户ID"
-        string stage "阶段"
-        string budget "预算"
-        string decision_maker "决策人"
-        text risk "风险"
-        text next_action "下一步动作"
-        date estimated_close_date "预计签约日期"
-        integer confidence "可信度"
-        text last_activity_summary "最近活动摘要"
-        timestamp last_generated_at "最后生成时间"
-        timestamp created_at "创建时间"
-        timestamp updated_at "更新时间"
+        VARCHAR(36) id PK
+        VARCHAR(36) customer_id FK
+        VARCHAR(36) user_id
+        VARCHAR(50) stage
+        VARCHAR(50) budget
+        VARCHAR(100) decision_maker
+        TEXT risk
+        TEXT next_action
+        DATE estimated_close_date
+        INTEGER confidence
+        TEXT last_activity_summary
+        TIMESTAMP last_generated_at
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        INTEGER total_tasks
+        INTEGER completed_tasks
+        INTEGER overdue_tasks
+        INTEGER task_completion_rate
     }
 ```
 
-## 4. 前端路由结构
+## 三、数据模型层级
 
 ```mermaid
-graph LR
-    A[/] --> B[工作台]
-    A --> C[/customers]
-    C --> D[/customers/[id]]
-    A --> E[/tasks]
-    A --> F[/inbox]
-    F --> G[/inbox/[id]]
-    A --> H[/suggestions]
-    H --> I[/suggestions/[id]]
-    A --> J[/knowledge]
-    A --> K[/settings]
+graph TD
+    A[User 用户]
+    B[Customer 公司]
+    C[Contact 联系人]
+    D[Project 项目]
+    E[Activity 活动]
+    F[Task 任务]
+    G[AI_Summary AI总结]
+    H[AI_Suggestion AI建议]
+
+    A --> B
+    B --> C
+    B --> D
+    B --> G
+    D --> E
+    D --> F
+    B --> E
+    B --> F
+    A --> H
 ```
 
-### 路由详情
+## 四、各模块职责
 
-| 路径 | 页面 | 功能 |
+### 4.1 前端模块
+
+| 模块 | 路径 | 职责 |
 |------|------|------|
-| `/` | DashboardPage | 工作台首页，AI分析入口 |
-| `/customers` | CustomersPage | 客户列表页 |
-| `/customers/[id]` | CustomerDetailPage | 客户详情页 |
-| `/tasks` | TasksPage | 任务管理页 |
-| `/inbox` | InboxPage | 收件箱页 |
-| `/inbox/[id]` | InboxDetailPage | 收件箱详情页 |
-| `/suggestions` | SuggestionsPage | AI建议列表页 |
-| `/suggestions/[id]` | SuggestionDetailPage | AI建议详情页 |
-| `/knowledge` | KnowledgePage | 知识库页 |
-| `/settings` | SettingsPage | 系统设置页 |
+| 首页 | `/src/app/page.tsx` | 工作台、AI助手、任务中心、重点客户 |
+| 客户管理 | `/src/app/customers/page.tsx` | 客户列表、新建客户、客户筛选 |
+| 客户详情 | `/src/app/customers/[id]/page.tsx` | 客户详情、时间线、关联任务 |
+| 任务中心 | `/src/app/tasks/page.tsx` | 任务列表、任务筛选、任务状态管理 |
+| 收件箱 | `/src/app/inbox/page.tsx` | 待处理事项列表 |
+| 建议 | `/src/app/suggestions/page.tsx` | AI建议管理 |
 
-## 5. 前后端依赖关系
+### 4.2 后端模块
 
-### 前端 API 调用映射
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| 用户认证 | `/app/api/auth.py` | 登录、认证、权限验证 |
+| 客户管理 | `/app/api/customers.py` | 客户CRUD、关联查询 |
+| 联系人管理 | `/app/models/contact.py` | 联系人数据模型 |
+| 项目管理 | `/app/api/projects.py` | 项目CRUD |
+| 任务管理 | `/app/api/tasks.py` | 任务CRUD、状态流转 |
+| 活动记录 | `/app/api/activities.py` | 活动CRUD、时间线 |
+| AI服务 | `/app/services/ai_service.py` | AI分析、内容生成 |
+| AI建议 | `/app/api/suggestions.py` | 建议分析、确认流程 |
+| 数据库 | `/app/database.py` | SQLite连接、Session管理 |
 
-| 前端页面 | 调用的 API | 方法 |
-|----------|-----------|------|
-| `/` | `/api/activities` | GET |
-| `/` | `/api/tasks` | GET |
-| `/` | `/api/customers` | GET |
-| `/` | `/api/suggestions/analyze` | POST |
-| `/` | `/api/suggestions/{id}/confirm` | POST |
-| `/customers` | `/api/customers` | GET |
-| `/customers/[id]` | `/api/customers/{id}` | GET |
-| `/customers/[id]` | `/api/customers/{id}/ai-summary` | GET |
-| `/customers/[id]` | `/api/activities/customer/{id}` | GET |
-| `/customers/[id]` | `/api/projects/customer/{id}` | GET |
-| `/tasks` | `/api/tasks` | GET |
-| `/tasks` | `/api/tasks/{id}` | PATCH |
-| `/inbox` | `/api/inbox` | GET |
-| `/inbox/[id]` | `/api/inbox/{id}` | PATCH |
-| `/suggestions` | `/api/suggestions/analyze` | POST |
+### 4.3 枚举定义
 
-### 代理配置
+| 枚举名 | 值 | 说明 |
+|--------|-----|------|
+| CustomerLevel | HIGH, MEDIUM, LOW | 客户价值等级 |
+| CustomerStatus | ACTIVE, FOLLOWING, PAUSED, LOST | 客户状态 |
+| ProjectStatus | LEAD, QUALIFIED, PROPOSAL, NEGOTIATION, WON, LOST | 项目阶段 |
+| TaskStatus | TODO, DOING, DONE | 任务状态 |
+| TaskPriority | HIGH, MEDIUM, LOW | 任务优先级 |
+| ActivitySource | capture, manual, email, meeting | 活动来源 |
+| SuggestionStatus | PENDING, CONFIRMED, CANCELLED | 建议状态 |
 
-前端通过 `next.config.mjs` 配置 API 代理：
+## 五、数据库一致性检查报告
 
-```js
-async rewrites() {
-  return [
-    {
-      source: '/api/:path*',
-      destination: 'http://localhost:8000/api/:path*'
-    }
-  ]
-}
-```
+### 5.1 代码模型 vs 数据库结构
 
-## 6. 项目结构
+| 表名 | 状态 | 问题 |
+|------|------|------|
+| customers | ✅ 一致 | 无 |
+| contacts | ✅ 一致 | 无 |
+| projects | ✅ 一致 | 无 |
+| tasks | ✅ 一致 | 无 |
+| activities | ✅ 一致 | 无 |
+| ai_suggestions | ✅ 一致 | 无 |
+| customer_ai_summary | ✅ 一致 | 无 |
+| users | ✅ 一致 | 无 |
 
-### 前端结构
+### 5.2 枚举值一致性
 
-```
-frontend/
-├── src/
-│   ├── app/                 # 路由页面
-│   │   ├── customers/       # 客户模块
-│   │   ├── inbox/           # 收件箱模块
-│   │   ├── knowledge/       # 知识库模块
-│   │   ├── settings/        # 设置模块
-│   │   ├── suggestions/     # AI建议模块
-│   │   ├── tasks/           # 任务模块
-│   │   ├── layout.tsx       # 根布局
-│   │   └── page.tsx         # 首页
-│   ├── components/          # 共享组件
-│   ├── context/             # React Context
-│   ├── hooks/               # 自定义Hooks
-│   ├── lib/                 # 工具函数
-│   ├── styles/              # 全局样式
-│   └── types/               # TypeScript类型定义
-├── next.config.mjs          # Next.js配置
-├── tailwind.config.js       # Tailwind配置
-├── postcss.config.mjs       # PostCSS配置
-└── package.json             # 依赖配置
-```
+| 枚举字段 | 数据库值 | 模型定义 | 状态 |
+|----------|----------|----------|------|
+| customers.level | HIGH, MEDIUM | HIGH, MEDIUM, LOW | ✅ 一致 |
+| customers.status | ACTIVE, FOLLOWING | ACTIVE, FOLLOWING, PAUSED, LOST | ✅ 一致 |
+| tasks.status | TODO | TODO, DOING, DONE | ✅ 一致 |
+| tasks.priority | HIGH, MEDIUM | HIGH, MEDIUM, LOW | ✅ 一致 |
+| activities.source | manual, capture | capture, manual, email, meeting | ✅ 一致 |
+| projects.status | LEAD, NEGOTIATION, QUALIFIED | LEAD, QUALIFIED, PROPOSAL, NEGOTIATION, WON, LOST | ✅ 一致 |
 
-### 后端结构
+### 5.3 外键关系
 
-```
-backend/
-├── app/
-│   ├── api/                 # API路由
-│   │   ├── activities.py
-│   │   ├── customers.py
-│   │   ├── customer_ai_summary.py
-│   │   ├── health.py
-│   │   ├── inbox.py
-│   │   ├── projects.py
-│   │   ├── suggestions.py
-│   │   └── tasks.py
-│   ├── config/              # 配置文件
-│   ├── models/              # 数据库模型
-│   ├── schemas/             # Pydantic模式
-│   ├── utils/               # 工具函数
-│   ├── database.py          # 数据库连接
-│   └── main.py              # 应用入口
-├── data/                    # SQLite数据文件
-└── requirements.txt         # Python依赖
-```
+| 外键 | 父表 | 状态 |
+|------|------|------|
+| contacts.customer_id | customers | ✅ 有效 |
+| projects.customer_id | customers | ✅ 有效 |
+| tasks.customer_id | customers | ✅ 有效 |
+| tasks.project_id | projects | ✅ 有效 |
+| activities.customer_id | customers | ✅ 有效 |
+| activities.project_id | projects | ✅ 有效 |
+| customer_ai_summary.customer_id | customers | ✅ 有效 |
+
+### 5.4 历史数据兼容性
+
+| 问题 | 状态 | 说明 |
+|------|------|------|
+| Activity Source MANUAL→manual | ✅ 已修复 | 数据已迁移 |
+| Task Status PENDING→TODO | ✅ 已修复 | 数据已迁移 |
+| Project Status .value调用 | ✅ 已修复 | 代码已兼容 |
+
+## 六、技术栈
+
+| 层次 | 技术 | 版本 |
+|------|------|------|
+| 前端框架 | Next.js | 14.2.35 |
+| UI框架 | React | 18+ |
+| 样式 | Tailwind CSS | 3+ |
+| 图标 | Lucide React | - |
+| HTTP客户端 | Axios | - |
+| 后端框架 | FastAPI | 0.115+ |
+| ORM | SQLAlchemy | 2+ |
+| 数据库 | SQLite | 3+ |
+| AI服务 | DeepSeek API | - |
