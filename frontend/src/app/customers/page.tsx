@@ -244,8 +244,8 @@ export default function CustomersPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <h2 className="text-lg font-semibold">新建客户</h2>
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-semibold">新建客户</h2>
               <button
                 onClick={() => setShowModal(false)}
                 className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
@@ -253,58 +253,61 @@ export default function CustomersPage() {
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">公司名称 <span className="text-red-500">*</span></label>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">公司名称</label>
                 <input
                   type="text"
                   value={newCustomer.name}
                   onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full px-4 py-3 bg-muted/20 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   placeholder="输入公司名称"
+                  autoFocus
                 />
               </div>
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">联系人</label>
-                <input
-                  type="text"
-                  value={newCustomer.contact_name}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, contact_name: e.target.value })}
-                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="输入联系人姓名"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-2 font-medium">联系人</label>
+                  <input
+                    type="text"
+                    value={newCustomer.contact_name}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, contact_name: e.target.value })}
+                    className="w-full px-4 py-3 bg-muted/20 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    placeholder="姓名"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-2 font-medium">职位</label>
+                  <input
+                    type="text"
+                    value={newCustomer.contact_position}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, contact_position: e.target.value })}
+                    className="w-full px-4 py-3 bg-muted/20 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    placeholder="职位"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">职位</label>
-                <input
-                  type="text"
-                  value={newCustomer.contact_position}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, contact_position: e.target.value })}
-                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="输入职位"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">备注</label>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">备注</label>
                 <textarea
                   value={newCustomer.remark}
                   onChange={(e) => setNewCustomer({ ...newCustomer, remark: e.target.value })}
-                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 h-20 resize-none"
-                  placeholder="输入备注信息"
+                  className="w-full px-4 py-3 bg-muted/20 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all h-20 resize-none"
+                  placeholder="输入备注信息（可选）"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-5 border-t border-border">
+            <div className="flex justify-end gap-3 p-6 border-t border-border">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={handleCreateCustomer}
                 disabled={!newCustomer.name.trim() || creating}
-                className="px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
               >
                 {creating ? "创建中..." : "创建客户"}
               </button>
