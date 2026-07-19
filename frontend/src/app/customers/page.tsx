@@ -185,11 +185,11 @@ export default function CustomersPage() {
             <Link
               key={customer.id}
               href={`/customers/${customer.id}`}
-              className="block bg-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow"
+              className="block bg-card rounded-xl shadow-sm p-6 hover:shadow-md hover:border-primary/20 transition-all border border-transparent"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold">{customer.name}</h3>
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
                       {getLevelLabel(customer.level)}
@@ -199,29 +199,29 @@ export default function CustomersPage() {
                     {customer.contacts && customer.contacts.length > 0 ? customer.contacts.map(c => c.name).join(", ") : "暂无联系人"}
                   </p>
                   
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {customer.projects && customer.projects.length > 0 && (
-                      <div className="flex items-start gap-2">
-                        <span className="text-xs text-muted-foreground font-medium mt-0.5 w-16 flex-shrink-0">项目：</span>
-                        <span className="text-sm text-foreground/80">{customer.projects[0].name}</span>
+                      <div className="bg-muted/30 rounded-lg p-3">
+                        <p className="text-xs text-muted-foreground mb-1">项目</p>
+                        <p className="text-sm font-medium text-foreground/90">{customer.projects[0].name}</p>
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground font-medium w-16 flex-shrink-0">阶段：</span>
+                    <div className="bg-muted/30 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">阶段</p>
                       <span className={`text-sm font-medium ${getStageClass(customer.ai_summary?.stage || "")} px-2 py-0.5 rounded-md`}>
                         {customer.ai_summary?.stage || "线索"}
                       </span>
                     </div>
                     
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs text-muted-foreground font-medium mt-0.5 w-16 flex-shrink-0">下一步：</span>
-                      <span className="text-sm text-foreground/80">{customer.next_action || "暂无"}</span>
+                    <div className="bg-muted/30 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">下一步</p>
+                      <p className="text-sm text-foreground/80">{customer.next_action || "暂无"}</p>
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground font-medium w-16 flex-shrink-0">最近更新：</span>
-                      <span className="text-sm text-muted-foreground">{formatDateTime(customer.updated_at)}</span>
+                    <div className="bg-muted/30 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">最后沟通</p>
+                      <p className="text-sm text-muted-foreground">{formatDateTime(customer.updated_at)}</p>
                     </div>
                   </div>
                 </div>
