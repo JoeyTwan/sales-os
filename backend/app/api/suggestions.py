@@ -67,6 +67,8 @@ class ConfirmRequest(BaseModel):
     customer: Optional[CustomerSuggestion] = None
     project: Optional[ProjectSuggestion] = None
     tasks: List[TaskSuggestion] = []
+    activity: Optional[str] = None
+    activity_time: Optional[str] = None
 
 
 class MockAIEngine:
@@ -313,14 +315,24 @@ def confirm_suggestion(suggestion_id: str, request: ConfirmRequest, db: Session 
         db.refresh(new_project)
         project_id = new_project.id
 
-    if customer_id or project_id:
+    if customer_id or project_id or request.activity:
         from app.models.activity import Activity
+        
+        activity_content = request.activity if request.activity else suggestion.raw_content
+        
+        activity_date = datetime.now().date()
+        if request.activity_time:
+            try:
+                activity_date = datetime.fromisoformat(request.activity_time).date()
+            except:
+                pass
+        
         activity = Activity(
             customer_id=customer_id,
             project_id=project_id,
             source="capture",
-            content=suggestion.raw_content,
-            activity_date=datetime.now().date(),
+            content=activity_content,
+            activity_date=activity_date,
             user_id=current_user.id,
         )
         db.add(activity)

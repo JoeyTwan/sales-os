@@ -25,7 +25,7 @@ SYSTEM_PROMPT = """
    - name: 项目名称（必填）
    - description: 项目描述（可选）
    - budget: 预算金额（可选，数字）
-   - status: 项目状态（LEAD/PROPOSAL/CLOSED，必填）
+   - status: 项目状态（LEAD/PROPOSAL/NEGOTIATION/CLOSED，必填）
 
 4. task: 任务信息
    - title: 任务标题（必填）
@@ -34,7 +34,7 @@ SYSTEM_PROMPT = """
    - due_date: 截止日期（可选，格式YYYY-MM-DD）
 
 5. activity: 活动信息
-   - content: 活动内容（可选）
+   - content: 活动内容（必填，需要对原文进行优化总结，禁止原文照抄，要专业、完整地描述沟通内容和进展）
 
 返回JSON。
 

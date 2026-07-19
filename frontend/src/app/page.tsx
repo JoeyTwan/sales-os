@@ -103,8 +103,23 @@ export default function DashboardPage() {
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [showTaskMenu, setShowTaskMenu] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editableCustomer, setEditableCustomer] = useState<CustomerSuggestion | null>(null);
+  const [editableProject, setEditableProject] = useState<ProjectSuggestion | null>(null);
+  const [editableTasks, setEditableTasks] = useState<TaskSuggestion[]>([]);
+  const [editableActivity, setEditableActivity] = useState("");
+  const [activityTime, setActivityTime] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomInputRef = useRef<HTMLDivElement>(null);
+  
+  const projectStatusOptions = [
+    { value: "LEAD", label: "线索" },
+    { value: "QUALIFIED", label: "需求确认" },
+    { value: "PROPOSAL", label: "方案设计" },
+    { value: "VERIFICATION", label: "技术验证" },
+    { value: "NEGOTIATION", label: "商务谈判" },
+    { value: "WON", label: "成交" },
+    { value: "PAUSED", label: "暂停" },
+  ];
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -156,6 +171,26 @@ export default function DashboardPage() {
         mode: inputMode
       });
       setAnalyzeResult(data);
+      
+      const now = new Date();
+      const timeStr = now.toISOString().slice(0, 16);
+      setActivityTime(timeStr);
+      
+      if (data.customers.length > 0) {
+        setEditableCustomer({ ...data.customers[0] });
+      } else {
+        setEditableCustomer(null);
+      }
+      
+      if (data.projects.length > 0) {
+        setEditableProject({ ...data.projects[0] });
+      } else {
+        setEditableProject(null);
+      }
+      
+      setEditableTasks(data.tasks.map(t => ({ ...t })));
+      setEditableActivity(data.raw_content);
+      
       setContent("");
       setShowModal(true);
       textareaRef.current?.focus();
@@ -165,24 +200,34 @@ export default function DashboardPage() {
   };
 
   const handleConfirm = async () => {
-    if (!analyzeResult) return;
+    if (!analyzeResult || confirming) return;
     setConfirming(true);
     try {
       const payload: any = {};
-      if (analyzeResult.customers.length > 0) {
-        payload.customer = analyzeResult.customers[0];
+      if (editableCustomer) {
+        payload.customer = editableCustomer;
       }
-      if (analyzeResult.projects.length > 0) {
-        payload.project = analyzeResult.projects[0];
+      if (editableProject) {
+        payload.project = editableProject;
       }
-      if (analyzeResult.tasks.length > 0) {
-        payload.tasks = analyzeResult.tasks;
+      if (editableTasks.length > 0) {
+        payload.tasks = editableTasks;
+      }
+      if (editableActivity) {
+        payload.activity = editableActivity;
+      }
+      if (activityTime) {
+        payload.activity_time = activityTime;
       }
 
       await apiPost(`/api/suggestions/${analyzeResult.suggestion_id}/confirm`, payload);
 
       setShowModal(false);
       setAnalyzeResult(null);
+      setEditableCustomer(null);
+      setEditableProject(null);
+      setEditableTasks([]);
+      setEditableActivity("");
       loadActivities();
       loadTasks();
       loadCustomers();
@@ -193,6 +238,10 @@ export default function DashboardPage() {
   const handleCancel = () => {
     setShowModal(false);
     setAnalyzeResult(null);
+    setEditableCustomer(null);
+    setEditableProject(null);
+    setEditableTasks([]);
+    setEditableActivity("");
     setExpandedContent(false);
   };
 
@@ -352,6 +401,9 @@ export default function DashboardPage() {
       }
       
       const dueDate = new Date(task.due_date);
+      if (isNaN(dueDate.getTime())) {
+        return activeTab === "all";
+      }
       dueDate.setHours(0, 0, 0, 0);
       
       switch (activeTab) {
@@ -725,127 +777,167 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {analyzeResult.matched_customer && (
-                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/5 rounded-lg px-3 py-2 mb-5">
+                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/5 rounded-lg px-3 py-2">
                   <CheckCircle className="w-4 h-4" />
                   <span>已匹配客户: {analyzeResult.matched_customer.name}</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-5">
-                  {analyzeResult.customers.length > 0 && (
-                    <div className="bg-muted/30 rounded-xl p-4">
-                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
-                        <User className="w-4 h-4" />
-                        <span>客户</span>
-                      </div>
-                      <div className="space-y-2">
-                        {analyzeResult.customers.map((customer, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-foreground">{customer.name}</p>
-                              {customer.company && (
-                                <p className="text-sm text-muted-foreground">{customer.company}</p>
-                              )}
-                            </div>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
-                              {getLevelLabel(customer.level)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-5">
-                  {analyzeResult.projects.length > 0 && (
-                    <div className="bg-muted/30 rounded-xl p-4">
-                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
-                        <Folder className="w-4 h-4" />
-                        <span>项目</span>
-                      </div>
-                      <div className="space-y-2">
-                        {analyzeResult.projects.map((project, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-foreground">{project.name}</p>
-                              {project.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-2">
-                                  {project.description}
-                                </p>
-                              )}
-                            </div>
-                            {project.budget && (
-                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-500/10 text-amber-600">
-                                {formatBudget(project.budget)}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {analyzeResult.tasks.length > 0 && (
-                    <div className="bg-muted/30 rounded-xl p-4">
-                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
-                        <ListTodo className="w-4 h-4" />
-                        <span>任务</span>
-                      </div>
-                      <div className="space-y-2">
-                        {analyzeResult.tasks.map((task, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-foreground">{task.title}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {task.due_date && (
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Calendar className="w-3 h-3" />
-                                  {formatDate(task.due_date)}
-                                </span>
-                              )}
-                              <span
-                                className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`}
-                                title={getPriorityLabel(task.priority)}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-muted/30 rounded-xl p-4 mt-5">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-3">
-                  <FileText className="w-4 h-4" />
-                  <span>活动记录</span>
-                </div>
-                {analyzeResult.raw_content.length > 200 ? (
-                  <div>
-                    <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                      {expandedContent
-                        ? analyzeResult.raw_content
-                        : analyzeResult.raw_content.substring(0, 200) + "..."}
-                    </p>
-                    <button
-                      onClick={() => setExpandedContent(!expandedContent)}
-                      className="mt-2 text-sm text-primary hover:text-primary/80 transition-colors"
-                    >
-                      {expandedContent ? "收起" : "展开"}
-                    </button>
+              {editableCustomer && (
+                <div className="bg-muted/30 rounded-xl p-5">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
+                    <User className="w-4 h-4" />
+                    <span>已识别客户</span>
                   </div>
-                ) : (
-                  <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                    {analyzeResult.raw_content}
-                  </p>
-                )}
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={editableCustomer.name}
+                      onChange={(e) => setEditableCustomer({ ...editableCustomer, name: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      placeholder="客户名称"
+                    />
+                    <input
+                      type="text"
+                      value={editableCustomer.company || ""}
+                      onChange={(e) => setEditableCustomer({ ...editableCustomer, company: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      placeholder="公司名称"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">客户等级:</span>
+                      <select
+                        value={editableCustomer.level}
+                        onChange={(e) => setEditableCustomer({ ...editableCustomer, level: e.target.value })}
+                        className="px-3 py-1.5 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      >
+                        <option value="HIGH">高</option>
+                        <option value="MEDIUM">中</option>
+                        <option value="LOW">低</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-muted/30 rounded-xl p-5">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
+                  <FileText className="w-4 h-4" />
+                  <span>建议记录</span>
+                </div>
+                <textarea
+                  value={editableActivity}
+                  onChange={(e) => setEditableActivity(e.target.value)}
+                  className="w-full px-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm leading-relaxed h-32 resize-none"
+                  placeholder="AI优化后的活动记录..."
+                />
+                <div className="flex items-center gap-2 mt-3">
+                  <span className="text-xs text-muted-foreground">记录时间:</span>
+                  <input
+                    type="datetime-local"
+                    value={activityTime}
+                    onChange={(e) => setActivityTime(e.target.value)}
+                    className="px-3 py-1.5 bg-card border border-border rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-primary/20"
+                  />
+                </div>
               </div>
+
+              {editableProject && (
+                <div className="bg-muted/30 rounded-xl p-5">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
+                    <Folder className="w-4 h-4" />
+                    <span>项目状态</span>
+                  </div>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={editableProject.name}
+                      onChange={(e) => setEditableProject({ ...editableProject, name: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      placeholder="项目名称"
+                    />
+                    <textarea
+                      value={editableProject.description || ""}
+                      onChange={(e) => setEditableProject({ ...editableProject, description: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm h-20 resize-none"
+                      placeholder="项目描述"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">当前阶段:</span>
+                      <select
+                        value={editableProject.status}
+                        onChange={(e) => setEditableProject({ ...editableProject, status: e.target.value })}
+                        className="px-3 py-1.5 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      >
+                        {projectStatusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {editableProject.budget && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">预算:</span>
+                        <span className="text-sm font-medium text-amber-600">{formatBudget(editableProject.budget)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {editableTasks.length > 0 && (
+                <div className="bg-muted/30 rounded-xl p-5">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
+                    <ListTodo className="w-4 h-4" />
+                    <span>建议任务</span>
+                  </div>
+                  <div className="space-y-3">
+                    {editableTasks.map((task, index) => (
+                      <div key={index} className="bg-card rounded-lg p-4">
+                        <input
+                          type="text"
+                          value={task.title}
+                          onChange={(e) => {
+                            const newTasks = [...editableTasks];
+                            newTasks[index].title = e.target.value;
+                            setEditableTasks(newTasks);
+                          }}
+                          className="w-full px-3 py-2 bg-transparent border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20 text-sm font-medium"
+                          placeholder="任务名称"
+                        />
+                        <div className="flex items-center gap-3 mt-3">
+                          <input
+                            type="date"
+                            value={task.due_date || ""}
+                            onChange={(e) => {
+                              const newTasks = [...editableTasks];
+                              newTasks[index].due_date = e.target.value;
+                              setEditableTasks(newTasks);
+                            }}
+                            className="px-3 py-1.5 bg-muted/50 border border-border rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-primary/20"
+                          />
+                          <select
+                            value={task.priority}
+                            onChange={(e) => {
+                              const newTasks = [...editableTasks];
+                              newTasks[index].priority = e.target.value;
+                              setEditableTasks(newTasks);
+                            }}
+                            className="px-3 py-1.5 bg-muted/50 border border-border rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-primary/20"
+                          >
+                            <option value="HIGH">高优先级</option>
+                            <option value="MEDIUM">中优先级</option>
+                            <option value="LOW">低优先级</option>
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {!hasData() && (
                 <div className="text-center py-6">
