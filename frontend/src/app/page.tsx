@@ -833,28 +833,9 @@ export default function DashboardPage() {
                       type="text"
                       value={editableCustomer.name}
                       onChange={(e) => setEditableCustomer({ ...editableCustomer, name: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                      placeholder="客户名称"
-                    />
-                    <input
-                      type="text"
-                      value={editableCustomer.company || ""}
-                      onChange={(e) => setEditableCustomer({ ...editableCustomer, company: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-medium"
                       placeholder="公司名称"
                     />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">客户等级:</span>
-                      <select
-                        value={editableCustomer.level}
-                        onChange={(e) => setEditableCustomer({ ...editableCustomer, level: e.target.value })}
-                        className="px-3 py-1.5 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20"
-                      >
-                        <option value="HIGH">高</option>
-                        <option value="MEDIUM">中</option>
-                        <option value="LOW">低</option>
-                      </select>
-                    </div>
                   </div>
                 </div>
               )}

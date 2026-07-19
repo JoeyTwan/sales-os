@@ -5,6 +5,20 @@ import Link from "next/link";
 import { TrendingUp, DollarSign, Calendar, AlertTriangle, Clock, Plus, X } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 
+interface Contact {
+  id: string;
+  name: string;
+  position: string;
+  customer_id: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  customer_id: string;
+}
+
 interface CustomerAISummary {
   stage: string;
   budget: string;
@@ -19,16 +33,15 @@ interface CustomerAISummary {
 interface Customer {
   id: string;
   name: string;
-  company: string;
-  contact: string;
   level: "HIGH" | "MEDIUM" | "LOW";
   status: "ACTIVE" | "FOLLOWING" | "PAUSED" | "LOST";
   summary: string;
-  current_requirement: string;
   next_action: string;
   next_action_date: string;
   created_at: string;
   updated_at: string;
+  contacts?: Contact[];
+  projects?: Project[];
   ai_summary?: CustomerAISummary;
 }
 
@@ -37,12 +50,9 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
-    company: "",
-    contact: "",
-    current_requirement: "",
-    next_action: "",
-    estimated_close_date: "",
-    value: "MEDIUM" as "HIGH" | "MEDIUM" | "LOW",
+    name: "",
+    contact_name: "",
+    contact_position: "",
     remark: "",
   });
   const [creating, setCreating] = useState(false);
@@ -61,22 +71,15 @@ export default function CustomersPage() {
   };
 
   const handleCreateCustomer = async () => {
-    if (!newCustomer.company.trim()) return;
+    if (!newCustomer.name.trim()) return;
     setCreating(true);
     try {
-      await apiPost("/api/customers", {
-        ...newCustomer,
-        level: newCustomer.value,
-        name: newCustomer.company,
-      });
+      await apiPost("/api/customers", newCustomer);
       setShowModal(false);
       setNewCustomer({
-        company: "",
-        contact: "",
-        current_requirement: "",
-        next_action: "",
-        estimated_close_date: "",
-        value: "MEDIUM",
+        name: "",
+        contact_name: "",
+        contact_position: "",
         remark: "",
       });
       loadCustomers();
@@ -186,19 +189,21 @@ export default function CustomersPage() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-4">
-                    <h3 className="text-lg font-semibold">{customer.company || customer.name}</h3>
+                  <div className="flex items-center gap-3 mb-3">
+                    <h3 className="text-lg font-semibold">{customer.name}</h3>
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
                       {getLevelLabel(customer.level)}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">{customer.contact || customer.name}</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {customer.contacts && customer.contacts.length > 0 ? customer.contacts.map(c => c.name).join(", ") : "暂无联系人"}
+                  </p>
                   
-                  <div className="space-y-3">
-                    {customer.current_requirement && (
+                  <div className="space-y-2">
+                    {customer.projects && customer.projects.length > 0 && (
                       <div className="flex items-start gap-2">
-                        <span className="text-xs text-muted-foreground font-medium mt-0.5 w-16 flex-shrink-0">需求：</span>
-                        <span className="text-sm text-foreground/80">{customer.current_requirement}</span>
+                        <span className="text-xs text-muted-foreground font-medium mt-0.5 w-16 flex-shrink-0">项目：</span>
+                        <span className="text-sm text-foreground/80">{customer.projects[0].name}</span>
                       </div>
                     )}
                     
@@ -215,7 +220,7 @@ export default function CustomersPage() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground font-medium w-16 flex-shrink-0">最后跟进：</span>
+                      <span className="text-xs text-muted-foreground font-medium w-16 flex-shrink-0">最近更新：</span>
                       <span className="text-sm text-muted-foreground">{formatDateTime(customer.updated_at)}</span>
                     </div>
                   </div>
@@ -253,8 +258,8 @@ export default function CustomersPage() {
                 <label className="block text-xs text-muted-foreground mb-1">公司名称 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
-                  value={newCustomer.company}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, company: e.target.value })}
+                  value={newCustomer.name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                   className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                   placeholder="输入公司名称"
                 />
@@ -263,53 +268,21 @@ export default function CustomersPage() {
                 <label className="block text-xs text-muted-foreground mb-1">联系人</label>
                 <input
                   type="text"
-                  value={newCustomer.contact}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, contact: e.target.value })}
+                  value={newCustomer.contact_name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, contact_name: e.target.value })}
                   className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                   placeholder="输入联系人姓名"
                 />
               </div>
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">当前需求</label>
-                <textarea
-                  value={newCustomer.current_requirement}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, current_requirement: e.target.value })}
-                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 h-20 resize-none"
-                  placeholder="输入当前需求"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">下一步计划</label>
+                <label className="block text-xs text-muted-foreground mb-1">职位</label>
                 <input
                   type="text"
-                  value={newCustomer.next_action}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, next_action: e.target.value })}
+                  value={newCustomer.contact_position}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, contact_position: e.target.value })}
                   className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="输入下一步计划"
+                  placeholder="输入职位"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">预计成交时间</label>
-                  <input
-                    type="date"
-                    value={newCustomer.estimated_close_date}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, estimated_close_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">客户价值</label>
-                  <select
-                    value={newCustomer.value}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, value: e.target.value as "HIGH" | "MEDIUM" | "LOW" })}
-                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="HIGH">高</option>
-                    <option value="MEDIUM">中</option>
-                    <option value="LOW">低</option>
-                  </select>
-                </div>
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">备注</label>
@@ -330,7 +303,7 @@ export default function CustomersPage() {
               </button>
               <button
                 onClick={handleCreateCustomer}
-                disabled={!newCustomer.company.trim() || creating}
+                disabled={!newCustomer.name.trim() || creating}
                 className="px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating ? "创建中..." : "创建客户"}

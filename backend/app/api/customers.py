@@ -7,6 +7,8 @@ from datetime import datetime
 from ..database import get_db
 from ..models.customer import Customer
 from ..models.customer_ai_summary import CustomerAISummary
+from ..models.contact import Contact
+from ..models.project import Project
 from ..schemas.customer import CustomerCreate, CustomerUpdate, CustomerOut
 from ..utils.auth import get_current_user
 from ..models.user import User
@@ -18,6 +20,22 @@ router = APIRouter(prefix="/api/customers", tags=["customers"])
 def _get_customer_with_summary(db: Session, customer: Customer) -> dict:
     customer_dict = customer.__dict__.copy()
     customer_dict.pop("_sa_instance_state", None)
+    
+    contacts = db.query(Contact).filter(Contact.customer_id == customer.id).all()
+    customer_dict["contacts"] = [{
+        "id": c.id,
+        "name": c.name,
+        "position": c.position,
+        "customer_id": c.customer_id,
+    } for c in contacts]
+    
+    projects = db.query(Project).filter(Project.customer_id == customer.id).all()
+    customer_dict["projects"] = [{
+        "id": p.id,
+        "name": p.name,
+        "status": p.status.value,
+        "customer_id": p.customer_id,
+    } for p in projects]
     
     summary = db.query(CustomerAISummary).filter(CustomerAISummary.customer_id == customer.id).first()
     if summary:
@@ -39,10 +57,22 @@ def _get_customer_with_summary(db: Session, customer: Customer) -> dict:
 
 @router.post("", response_model=CustomerOut)
 def create_customer(customer: CustomerCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    db_customer = Customer(**customer.model_dump(), user_id=current_user.id)
+    customer_data = customer.model_dump(exclude={"contact_name", "contact_position", "remark"})
+    db_customer = Customer(**customer_data, user_id=current_user.id)
     db.add(db_customer)
     db.commit()
     db.refresh(db_customer)
+    
+    if customer.contact_name:
+        db_contact = Contact(
+            customer_id=db_customer.id,
+            name=customer.contact_name,
+            position=customer.contact_position,
+            user_id=current_user.id,
+        )
+        db.add(db_contact)
+        db.commit()
+    
     return _get_customer_with_summary(db, db_customer)
 
 
