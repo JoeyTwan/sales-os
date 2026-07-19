@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { X, CheckCircle, User, Folder, ListTodo, Calendar, FileText, Plus, MoreHorizontal, Edit2, Trash2, Pin, Sparkles, Target, ClipboardList } from "lucide-react";
+import { X, CheckCircle, User, Folder, ListTodo, Calendar, FileText, Plus, MoreHorizontal, Edit2, Trash2, Pin, Sparkles, Target, ClipboardList, Clock } from "lucide-react";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 
 interface Activity {
@@ -22,17 +22,32 @@ interface Task {
   is_pinned?: boolean;
 }
 
+interface CustomerAISummary {
+  stage: string;
+  budget: string;
+  decision_maker: string;
+  risk: string;
+  next_action: string;
+  estimated_close_date: string;
+  confidence: number;
+  last_activity_summary: string;
+}
+
 interface Customer {
   id: string;
   name: string;
+  company: string;
+  contact: string;
   level: "HIGH" | "MEDIUM" | "LOW";
   status: "ACTIVE" | "FOLLOWING" | "PAUSED" | "LOST";
   summary: string;
+  current_requirement: string;
   next_action: string;
   next_action_date: string;
   created_at: string;
   updated_at: string;
   projects?: Project[];
+  ai_summary?: CustomerAISummary;
 }
 
 interface Project {
@@ -283,6 +298,30 @@ export default function DashboardPage() {
     return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
   };
 
+  const formatDateTime = (dateStr: string) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return "今天";
+    if (days === 1) return "昨天";
+    if (days < 7) return `${days}天前`;
+    return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+  };
+
+  const getStageClass = (stage: string) => {
+    if (!stage) return "bg-muted/50 text-muted-foreground";
+    if (stage.includes("线索")) return "bg-blue-500/10 text-blue-600";
+    if (stage.includes("确认")) return "bg-green-500/10 text-green-600";
+    if (stage.includes("方案")) return "bg-purple-500/10 text-purple-600";
+    if (stage.includes("验证")) return "bg-cyan-500/10 text-cyan-600";
+    if (stage.includes("谈判")) return "bg-orange-500/10 text-orange-600";
+    if (stage.includes("成交")) return "bg-emerald-500/10 text-emerald-600";
+    if (stage.includes("暂停")) return "bg-gray-500/10 text-gray-600";
+    return "bg-muted/50 text-muted-foreground";
+  };
+
   const truncateContent = (text: string, maxLength: number = 80) => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + "...";
@@ -430,7 +469,7 @@ export default function DashboardPage() {
     });
   };
 
-  const getTaskStats = () => {
+  const getDashboardStats = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -438,36 +477,58 @@ export default function DashboardPage() {
       if (!t.due_date) return false;
       const dueDate = new Date(t.due_date);
       dueDate.setHours(0, 0, 0, 0);
-      return dueDate.getTime() === today.getTime();
+      return dueDate.getTime() === today.getTime() && t.status !== "DONE";
     });
     
-    const sevenDaysLater = new Date(today);
-    sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
-    
-    const sevenDayTasks = tasks.filter(t => {
-      if (!t.due_date) return false;
-      const dueDate = new Date(t.due_date);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate >= today && dueDate <= sevenDaysLater;
-    });
-    
-    const overdueTasks = tasks.filter(t => {
+    const threeDaysLater = new Date(today);
+    threeDaysLater.setDate(threeDaysLater.getDate() + 3);
+    const upcomingOverdueTasks = tasks.filter(t => {
       if (!t.due_date || t.status === "DONE") return false;
       const dueDate = new Date(t.due_date);
       dueDate.setHours(0, 0, 0, 0);
-      return dueDate < today;
+      return dueDate > today && dueDate <= threeDaysLater;
     });
     
+    const needFollowUpCustomers = customers.filter(c => {
+      if (c.status === "LOST" || c.status === "PAUSED") return false;
+      if (!c.next_action_date) return true;
+      const nextDate = new Date(c.next_action_date);
+      nextDate.setHours(0, 0, 0, 0);
+      return nextDate <= today;
+    }).length;
+    
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    const recentNewCustomers = customers.filter(c => {
+      const createdAt = new Date(c.created_at);
+      return createdAt >= lastWeek;
+    }).length;
+    
     return {
+      todayTasks: todayTasks.length,
+      needFollowUpCustomers,
+      upcomingOverdue: upcomingOverdueTasks.length,
+      recentNewCustomers,
       todo: tasks.filter(t => t.status === "TODO").length,
-      today: todayTasks.length,
-      sevenDays: sevenDayTasks.length,
-      overdue: overdueTasks.length,
+      sevenDays: tasks.filter(t => {
+        if (!t.due_date || t.status === "DONE") return false;
+        const dueDate = new Date(t.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        const sevenDaysLater = new Date(today);
+        sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
+        return dueDate >= today && dueDate <= sevenDaysLater;
+      }).length,
+      overdue: tasks.filter(t => {
+        if (!t.due_date || t.status === "DONE") return false;
+        const dueDate = new Date(t.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        return dueDate < today;
+      }).length,
       completed: tasks.filter(t => t.status === "DONE").length
     };
   };
 
-  const stats = getTaskStats();
+  const stats = getDashboardStats();
 
   return (
     <div className="min-h-screen pb-32">
@@ -477,72 +538,47 @@ export default function DashboardPage() {
       </div>
 
       <div className="bg-card rounded-2xl shadow-sm p-6 mb-8">
-        <h2 className="text-sm font-semibold text-muted-foreground mb-6">今日概览</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-muted/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <ListTodo className="w-4 h-4 text-primary" />
-                </div>
-                <span className="text-xs text-muted-foreground">待办统计</span>
+        <h2 className="text-sm font-semibold text-muted-foreground mb-6">今日重点</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-muted/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ListTodo className="w-4 h-4 text-primary" />
               </div>
-              <p className="text-2xl font-bold">{stats.todo}</p>
-              <p className="text-xs text-muted-foreground mt-1">待处理任务</p>
+              <span className="text-xs text-muted-foreground">今日待办</span>
             </div>
-            <div className="bg-muted/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <Calendar className="w-4 h-4 text-amber-500" />
-                </div>
-                <span className="text-xs text-muted-foreground">今日任务</span>
-              </div>
-              <p className="text-2xl font-bold">{stats.today}</p>
-              <p className="text-xs text-muted-foreground mt-1">今天到期</p>
-            </div>
-            <div className="bg-muted/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-blue-500" />
-                </div>
-                <span className="text-xs text-muted-foreground">7天任务</span>
-              </div>
-              <p className="text-2xl font-bold">{stats.sevenDays}</p>
-              <p className="text-xs text-muted-foreground mt-1">本周计划</p>
-            </div>
-            <div className="bg-muted/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <ClipboardList className="w-4 h-4 text-red-500" />
-                </div>
-                <span className="text-xs text-muted-foreground">逾期任务</span>
-              </div>
-              <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-              <p className="text-xs text-muted-foreground mt-1">需要关注</p>
-            </div>
+            <p className="text-2xl font-bold">{stats.todayTasks}</p>
+            <p className="text-xs text-muted-foreground mt-1">今天要完成的任务</p>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-muted/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <User className="w-4 h-4 text-green-500" />
-                </div>
-                <span className="text-xs text-muted-foreground">客户概览</span>
+          <div className="bg-muted/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <User className="w-4 h-4 text-green-500" />
               </div>
-              <p className="text-2xl font-bold">{customers.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">活跃客户</p>
+              <span className="text-xs text-muted-foreground">待跟进客户</span>
             </div>
-            <div className="bg-muted/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <Folder className="w-4 h-4 text-purple-500" />
-                </div>
-                <span className="text-xs text-muted-foreground">待推进项目</span>
+            <p className="text-2xl font-bold">{stats.needFollowUpCustomers}</p>
+            <p className="text-xs text-muted-foreground mt-1">需要联系的客户</p>
+          </div>
+          <div className="bg-muted/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Clock className="w-4 h-4 text-amber-500" />
               </div>
-              <p className="text-2xl font-bold">{customers.filter(c => c.status === "FOLLOWING").length}</p>
-              <p className="text-xs text-muted-foreground mt-1">重点跟进</p>
+              <span className="text-xs text-muted-foreground">即将超期</span>
             </div>
+            <p className="text-2xl font-bold text-amber-600">{stats.upcomingOverdue}</p>
+            <p className="text-xs text-muted-foreground mt-1">3天内到期的任务</p>
+          </div>
+          <div className="bg-muted/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-blue-500" />
+              </div>
+              <span className="text-xs text-muted-foreground">新增客户</span>
+            </div>
+            <p className="text-2xl font-bold">{stats.recentNewCustomers}</p>
+            <p className="text-xs text-muted-foreground mt-1">最近7天新增</p>
           </div>
         </div>
       </div>
@@ -714,37 +750,38 @@ export default function DashboardPage() {
                     href={`/customers/${customer.id}`}
                     className="block bg-muted/20 rounded-xl p-4 hover:bg-muted/40 transition-colors"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
-                            {getLevelLabel(customer.level)}
-                          </span>
-                          <h3 className="font-medium truncate">{customer.name}</h3>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {getStatusLabelCustomer(customer.status)}
-                        </p>
-                        {customer.next_action && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            下一步：{customer.next_action}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <User className="w-4 h-4 text-primary" />
-                        </div>
-                      </div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
+                        {getLevelLabel(customer.level)}
+                      </span>
+                      <h3 className="font-semibold">{customer.company || customer.name}</h3>
                     </div>
-                    {customer.next_action_date && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Calendar className="w-3 h-3" />
-                          下次跟进：{formatDate(customer.next_action_date)}
+                    
+                    <div className="space-y-2">
+                      {customer.projects && customer.projects.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs text-muted-foreground font-medium mt-0.5 w-12 flex-shrink-0">项目：</span>
+                          <span className="text-sm text-foreground/80">{customer.projects[0].name}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground font-medium w-12 flex-shrink-0">阶段：</span>
+                        <span className={`text-sm font-medium ${getStageClass(customer.ai_summary?.stage || "")} px-2 py-0.5 rounded-md`}>
+                          {customer.ai_summary?.stage || "线索"}
                         </span>
                       </div>
-                    )}
+                      
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-muted-foreground font-medium mt-0.5 w-12 flex-shrink-0">下一步：</span>
+                        <span className="text-sm text-foreground/80">{customer.next_action || "暂无"}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground font-medium w-12 flex-shrink-0">最后沟通：</span>
+                        <span className="text-sm text-muted-foreground">{formatDateTime(customer.updated_at)}</span>
+                      </div>
+                    </div>
                   </Link>
                 ))}
               </div>

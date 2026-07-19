@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List
+from datetime import datetime
 
 from ..database import get_db
 from ..models.customer import Customer
@@ -9,6 +10,7 @@ from ..models.customer_ai_summary import CustomerAISummary
 from ..schemas.customer import CustomerCreate, CustomerUpdate, CustomerOut
 from ..utils.auth import get_current_user
 from ..models.user import User
+from ..utils.date_parser import parse_natural_date
 
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 

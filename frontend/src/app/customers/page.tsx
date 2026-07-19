@@ -19,9 +19,12 @@ interface CustomerAISummary {
 interface Customer {
   id: string;
   name: string;
+  company: string;
+  contact: string;
   level: "HIGH" | "MEDIUM" | "LOW";
   status: "ACTIVE" | "FOLLOWING" | "PAUSED" | "LOST";
   summary: string;
+  current_requirement: string;
   next_action: string;
   next_action_date: string;
   created_at: string;
@@ -34,12 +37,13 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
-    name: "",
-    level: "MEDIUM" as "HIGH" | "MEDIUM" | "LOW",
-    status: "ACTIVE" as "ACTIVE" | "FOLLOWING" | "PAUSED" | "LOST",
-    summary: "",
+    company: "",
+    contact: "",
+    current_requirement: "",
     next_action: "",
-    next_action_date: "",
+    estimated_close_date: "",
+    value: "MEDIUM" as "HIGH" | "MEDIUM" | "LOW",
+    remark: "",
   });
   const [creating, setCreating] = useState(false);
 
@@ -57,18 +61,23 @@ export default function CustomersPage() {
   };
 
   const handleCreateCustomer = async () => {
-    if (!newCustomer.name.trim()) return;
+    if (!newCustomer.company.trim()) return;
     setCreating(true);
     try {
-      await apiPost("/api/customers", newCustomer);
+      await apiPost("/api/customers", {
+        ...newCustomer,
+        level: newCustomer.value,
+        name: newCustomer.company,
+      });
       setShowModal(false);
       setNewCustomer({
-        name: "",
-        level: "MEDIUM",
-        status: "ACTIVE",
-        summary: "",
+        company: "",
+        contact: "",
+        current_requirement: "",
         next_action: "",
-        next_action_date: "",
+        estimated_close_date: "",
+        value: "MEDIUM",
+        remark: "",
       });
       loadCustomers();
     } catch {} finally {
@@ -177,62 +186,39 @@ export default function CustomersPage() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-lg font-medium">{customer.name}</span>
+                  <div className="flex items-center gap-3 mb-4">
+                    <h3 className="text-lg font-semibold">{customer.company || customer.name}</h3>
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
                       {getLevelLabel(customer.level)}
                     </span>
-                    <span className="text-sm text-muted-foreground">{getStatusLabel(customer.status)}</span>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-4">{customer.contact || customer.name}</p>
                   
-                  {customer.ai_summary && (
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span className={`text-sm font-medium ${getStageClass(customer.ai_summary.stage)} px-2 py-1 rounded-md`}>
-                            {customer.ai_summary.stage || "线索阶段"}
-                          </span>
-                        </div>
-                        {customer.ai_summary.budget && (
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-sm font-medium text-amber-600">{customer.ai_summary.budget}</span>
-                          </div>
-                        )}
+                  <div className="space-y-3">
+                    {customer.current_requirement && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-muted-foreground font-medium mt-0.5 w-16 flex-shrink-0">需求：</span>
+                        <span className="text-sm text-foreground/80">{customer.current_requirement}</span>
                       </div>
-                      
-                      {customer.ai_summary.risk && (
-                        <div className="flex items-center gap-2 text-orange-600 bg-orange-50/50 px-3 py-2 rounded-lg">
-                          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm">{customer.ai_summary.risk}</span>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="text-foreground/70">{customer.ai_summary.next_action || "暂无下一步"}</span>
-                        {customer.ai_summary.estimated_close_date && (
-                          <>
-                            <span className="text-border">|</span>
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>预计签约: {formatDate(customer.ai_summary.estimated_close_date)}</span>
-                          </>
-                        )}
-                      </div>
-                      
-                      {customer.ai_summary.last_activity_summary && (
-                        <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg">
-                          <Clock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                          <span>{truncateActivity(customer.ai_summary.last_activity_summary)}</span>
-                        </div>
-                      )}
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-medium w-16 flex-shrink-0">阶段：</span>
+                      <span className={`text-sm font-medium ${getStageClass(customer.ai_summary?.stage || "")} px-2 py-0.5 rounded-md`}>
+                        {customer.ai_summary?.stage || "线索"}
+                      </span>
                     </div>
-                  )}
-                </div>
-                
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">最近更新</p>
-                  <p className="text-sm font-medium">{formatDateTime(customer.updated_at)}</p>
+                    
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs text-muted-foreground font-medium mt-0.5 w-16 flex-shrink-0">下一步：</span>
+                      <span className="text-sm text-foreground/80">{customer.next_action || "暂无"}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-medium w-16 flex-shrink-0">最后跟进：</span>
+                      <span className="text-sm text-muted-foreground">{formatDateTime(customer.updated_at)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </Link>
@@ -264,21 +250,59 @@ export default function CustomersPage() {
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">客户名称</label>
+                <label className="block text-xs text-muted-foreground mb-1">公司名称 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
-                  value={newCustomer.name}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  value={newCustomer.company}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, company: e.target.value })}
                   className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="输入客户名称"
+                  placeholder="输入公司名称"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">联系人</label>
+                <input
+                  type="text"
+                  value={newCustomer.contact}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, contact: e.target.value })}
+                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="输入联系人姓名"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">当前需求</label>
+                <textarea
+                  value={newCustomer.current_requirement}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, current_requirement: e.target.value })}
+                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 h-20 resize-none"
+                  placeholder="输入当前需求"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">下一步计划</label>
+                <input
+                  type="text"
+                  value={newCustomer.next_action}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, next_action: e.target.value })}
+                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="输入下一步计划"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">客户等级</label>
+                  <label className="block text-xs text-muted-foreground mb-1">预计成交时间</label>
+                  <input
+                    type="date"
+                    value={newCustomer.estimated_close_date}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, estimated_close_date: e.target.value })}
+                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">客户价值</label>
                   <select
-                    value={newCustomer.level}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, level: e.target.value as "HIGH" | "MEDIUM" | "LOW" })}
+                    value={newCustomer.value}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, value: e.target.value as "HIGH" | "MEDIUM" | "LOW" })}
                     className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                   >
                     <option value="HIGH">高</option>
@@ -286,46 +310,14 @@ export default function CustomersPage() {
                     <option value="LOW">低</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">客户状态</label>
-                  <select
-                    value={newCustomer.status}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, status: e.target.value as "ACTIVE" | "FOLLOWING" | "PAUSED" | "LOST" })}
-                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="ACTIVE">跟进中</option>
-                    <option value="FOLLOWING">重点推进</option>
-                    <option value="PAUSED">已暂停</option>
-                    <option value="LOST">已丢失</option>
-                  </select>
-                </div>
               </div>
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">摘要</label>
+                <label className="block text-xs text-muted-foreground mb-1">备注</label>
                 <textarea
-                  value={newCustomer.summary}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, summary: e.target.value })}
+                  value={newCustomer.remark}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, remark: e.target.value })}
                   className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 h-20 resize-none"
-                  placeholder="输入客户摘要"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">下一步动作</label>
-                <input
-                  type="text"
-                  value={newCustomer.next_action}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, next_action: e.target.value })}
-                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="输入下一步动作"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">下次跟进日期</label>
-                <input
-                  type="date"
-                  value={newCustomer.next_action_date}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, next_action_date: e.target.value })}
-                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="输入备注信息"
                 />
               </div>
             </div>
@@ -338,7 +330,7 @@ export default function CustomersPage() {
               </button>
               <button
                 onClick={handleCreateCustomer}
-                disabled={!newCustomer.name.trim() || creating}
+                disabled={!newCustomer.company.trim() || creating}
                 className="px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating ? "创建中..." : "创建客户"}
