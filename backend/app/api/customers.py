@@ -33,7 +33,7 @@ def _get_customer_with_summary(db: Session, customer: Customer) -> dict:
     customer_dict["projects"] = [{
         "id": p.id,
         "name": p.name,
-        "status": p.status.value,
+        "status": p.status.value if hasattr(p.status, 'value') else p.status,
         "customer_id": p.customer_id,
     } for p in projects]
     
