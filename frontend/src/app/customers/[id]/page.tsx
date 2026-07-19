@@ -54,6 +54,16 @@ interface Activity {
   created_at: string;
 }
 
+interface TimelineItem {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  timestamp: string;
+  status?: string;
+  priority?: string;
+}
+
 interface Task {
   id: string;
   customer_id: string | null;
@@ -73,6 +83,7 @@ export default function CustomerDetailPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -81,6 +92,7 @@ export default function CustomerDetailPage() {
     loadProjects();
     loadActivities();
     loadTasks();
+    loadTimeline();
   }, [id]);
 
   const loadCustomer = async () => {
@@ -122,6 +134,13 @@ export default function CustomerDetailPage() {
     try {
       const data = await apiGet<Task[]>(`/api/tasks/customer/${id}`);
       setTasks(data);
+    } catch {}
+  };
+
+  const loadTimeline = async () => {
+    try {
+      const data = await apiGet<TimelineItem[]>(`/api/activities/customer/${id}/timeline`);
+      setTimeline(data);
     } catch {}
   };
 
@@ -638,40 +657,46 @@ export default function CustomerDetailPage() {
               <span>时间线</span>
             </div>
 
-            {activities.length > 0 ? (
+            {timeline.length > 0 ? (
               <div className="relative">
                 <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-border"></div>
                 <div className="space-y-6">
-                  {Object.entries(activityGroups).map(([date, dateActivities]) => (
-                    <div key={date}>
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-card border-2 border-primary flex items-center justify-center z-10">
-                          <Calendar className="w-4 h-4 text-primary" />
+                  {timeline.map((item) => {
+                    const iconColor = item.type === 'activity' ? 'bg-primary/10 text-primary' : 
+                                     item.type === 'task' ? 'bg-blue-500/10 text-blue-600' : 
+                                     'bg-purple-500/10 text-purple-600';
+                    const IconComponent = item.type === 'activity' ? FileText : 
+                                         item.type === 'task' ? Target : Folder;
+                    
+                    return (
+                      <div key={item.id} className="relative">
+                        <div className={`absolute left-0 w-10 h-10 rounded-full ${iconColor} flex items-center justify-center z-10`}>
+                          <IconComponent className="w-4 h-4" />
                         </div>
-                        <span className="font-medium">{date}</span>
-                      </div>
-                      <div className="ml-14 space-y-4">
-                        {dateActivities.map((activity) => (
-                          <div key={activity.id} className="bg-muted/30 rounded-xl p-5">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSourceClass(activity.source)}`}>
-                                {getSourceLabel(activity.source)}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {formatDateTime(activity.created_at)}
-                              </span>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                                {activity.content}
-                              </p>
-                            </div>
+                        <div className="ml-14 bg-muted/30 rounded-xl p-5">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${iconColor}`}>
+                              {item.title}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDateTime(item.timestamp)}
+                            </span>
                           </div>
-                        ))}
+                          <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                            {item.content}
+                          </p>
+                          {item.status && item.type === 'project' && (
+                            <div className="flex items-center gap-2 mt-3">
+                              <span className="text-xs text-muted-foreground">状态:</span>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getProjectStatusClass(item.status)}`}>
+                                {getProjectStatusLabel(item.status)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (

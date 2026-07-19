@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from datetime import date, datetime
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from ..database import get_db
 from ..models.activity import Activity
+from ..models.task import Task
+from ..models.project import Project
 from ..utils.auth import get_current_user
 from ..models.user import User
 
@@ -104,3 +106,72 @@ def get_customer_activities(customer_id: str, db: Session = Depends(get_db), cur
         .all()
     )
     return activities
+
+
+class TimelineItem(BaseModel):
+    id: str
+    type: str
+    title: str
+    content: str
+    timestamp: datetime
+    status: Optional[str] = None
+    priority: Optional[str] = None
+
+
+@router.get("/customer/{customer_id}/timeline")
+def get_customer_timeline(customer_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    timeline = []
+    
+    activities = (
+        db.query(Activity)
+        .filter(Activity.customer_id == customer_id)
+        .order_by(desc(Activity.created_at))
+        .all()
+    )
+    for activity in activities:
+        timeline.append({
+            "id": activity.id,
+            "type": "activity",
+            "title": "活动记录",
+            "content": activity.content,
+            "timestamp": activity.created_at,
+            "status": activity.source,
+        })
+    
+    tasks = (
+        db.query(Task)
+        .filter(Task.customer_id == customer_id)
+        .order_by(desc(Task.created_at))
+        .all()
+    )
+    for task in tasks:
+        timeline.append({
+            "id": task.id,
+            "type": "task",
+            "title": "创建任务",
+            "content": task.title,
+            "timestamp": task.created_at,
+            "status": task.status,
+            "priority": task.priority,
+        })
+    
+    projects = (
+        db.query(Project)
+        .filter(Project.customer_id == customer_id)
+        .order_by(desc(Project.created_at))
+        .all()
+    )
+    for project in projects:
+        status = project.status.value if hasattr(project.status, 'value') else project.status
+        timeline.append({
+            "id": project.id,
+            "type": "project",
+            "title": "项目状态变更",
+            "content": project.name,
+            "timestamp": project.updated_at,
+            "status": status,
+        })
+    
+    timeline.sort(key=lambda x: x["timestamp"], reverse=True)
+    
+    return timeline[:50]
