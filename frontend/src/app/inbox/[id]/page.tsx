@@ -328,7 +328,7 @@ export default function InboxDetailPage() {
                     type="date"
                     value={customerForm.next_action_date}
                     onChange={(e) => setCustomerForm({ ...customerForm, next_action_date: e.target.value })}
-                    className="w-full bg-transparent border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full bg-zinc-800 dark:bg-zinc-800 light:bg-gray-100 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
@@ -411,7 +411,7 @@ export default function InboxDetailPage() {
                     type="date"
                     value={taskForm.due_date}
                     onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
-                    className="w-full bg-transparent border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full bg-zinc-800 dark:bg-zinc-800 light:bg-gray-100 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>

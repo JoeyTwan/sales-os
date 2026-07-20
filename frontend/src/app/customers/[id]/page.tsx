@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, User, Folder, FileText, Calendar, Clock, Target, DollarSign, Users, Zap, TrendingUp, AlertTriangle, RefreshCw, Brain } from "lucide-react";
+import { ArrowLeft, User, Folder, FileText, Calendar, Clock, Target, DollarSign, Users, Zap, TrendingUp, AlertTriangle, RefreshCw, Brain, Plus, X } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 
 interface Customer {
@@ -86,6 +86,18 @@ export default function CustomerDetailPage() {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [brainInput, setBrainInput] = useState("");
+  const [brainMessages, setBrainMessages] = useState<{ role: "user" | "ai"; content: string }[]>([]);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [projectError, setProjectError] = useState("");
+  const [newProject, setNewProject] = useState({
+    name: "",
+    customer_id: id as string,
+    status: "LEAD" as Project["status"],
+    budget: "",
+    description: "",
+  });
 
   useEffect(() => {
     loadCustomer();
@@ -192,17 +204,21 @@ export default function CustomerDetailPage() {
   const getProjectStatusLabel = (status: string) => {
     switch (status) {
       case "LEAD":
-        return "线索";
+        return "线索阶段";
       case "QUALIFIED":
-        return "已确认";
+        return "需求确认";
       case "PROPOSAL":
-        return "方案中";
+        return "方案设计";
+      case "VERIFICATION":
+        return "技术验证";
       case "NEGOTIATION":
-        return "谈判中";
+        return "商务谈判";
       case "WON":
         return "已成交";
       case "LOST":
-        return "已流失";
+        return "售后维护";
+      default:
+        return status;
     }
   };
 
@@ -214,12 +230,16 @@ export default function CustomerDetailPage() {
         return "bg-green-500/10 text-green-600";
       case "PROPOSAL":
         return "bg-purple-500/10 text-purple-600";
+      case "VERIFICATION":
+        return "bg-cyan-500/10 text-cyan-600";
       case "NEGOTIATION":
         return "bg-orange-500/10 text-orange-600";
       case "WON":
         return "bg-emerald-500/10 text-emerald-600";
       case "LOST":
-        return "bg-red-500/10 text-red-600";
+        return "bg-gray-500/10 text-gray-600";
+      default:
+        return "bg-muted/50 text-muted-foreground";
     }
   };
 
@@ -399,6 +419,32 @@ export default function CustomerDetailPage() {
   const activityGroups = groupActivitiesByDate();
   const aiSummary = customer.ai_summary;
 
+  const handleCreateProject = async () => {
+    if (!newProject.name.trim()) return;
+    setCreatingProject(true);
+    setProjectError("");
+    try {
+      await apiPost("/api/projects", {
+        ...newProject,
+        budget: newProject.budget ? parseInt(newProject.budget) : null,
+      });
+      setShowProjectModal(false);
+      setNewProject({
+        name: "",
+        customer_id: id as string,
+        status: "LEAD",
+        budget: "",
+        description: "",
+      });
+      loadProjects();
+    } catch (err) {
+      setProjectError("创建项目失败，请稍后重试");
+      console.error("Create project error:", err);
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   return (
     <div className="py-8">
       <div className="flex items-center gap-4 mb-8">
@@ -415,133 +461,71 @@ export default function CustomerDetailPage() {
         </span>
       </div>
 
-      <div className="bg-gradient-to-br from-primary/5 via-card to-primary/5 rounded-2xl p-8 mb-8 border border-primary/10 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Brain className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold">Customer Brain</h2>
-              <p className="text-xs text-muted-foreground">AI 智能分析客户数据</p>
-            </div>
+      <div className="bg-card rounded-xl shadow-sm p-6 mb-8 border border-primary/5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">客户战略大脑</span>
           </div>
           <button
             onClick={refreshAISummary}
             disabled={refreshing}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
             <span>刷新</span>
           </button>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">阶段</p>
-            <span className={`inline-flex px-3 py-2 text-sm font-medium rounded-xl ${getStageClass(aiSummary?.stage || "")}`}>
-              {aiSummary?.stage || "-"}
-            </span>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">预算</p>
-            <p className="text-xl font-semibold text-amber-600">{aiSummary?.budget || "-"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">决策人</p>
-            <p className="text-lg font-medium">{aiSummary?.decision_maker || "-"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">AI可信度</p>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all ${aiSummary?.confidence && aiSummary.confidence >= 80 ? "bg-emerald-500" : aiSummary?.confidence && aiSummary.confidence >= 50 ? "bg-amber-500" : "bg-red-500"}`}
-                  style={{ width: `${aiSummary?.confidence || 0}%` }}
-                ></div>
-              </div>
-              <span className={`text-sm font-medium ${getConfidenceColor(aiSummary?.confidence || 0)}`}>
-                {aiSummary?.confidence || 0}%
-              </span>
-            </div>
-          </div>
-          {aiSummary?.risk && (
-            <div className="lg:col-span-4">
-              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                <span>风险提示</span>
-              </p>
-              <p className="text-sm text-orange-600 bg-orange-50/50 px-4 py-3 rounded-xl">
-                {aiSummary.risk}
-              </p>
-            </div>
-          )}
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">下一步</p>
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">{aiSummary?.next_action || "-"}</span>
-            </div>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">预计签约</p>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">{formatDate(aiSummary?.estimated_close_date || "") || "-"}</span>
-            </div>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">任务进度</p>
-            <div>
-              <p className="text-lg font-semibold">
-                {aiSummary?.completed_tasks || 0}/{aiSummary?.total_tasks || 0}
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary rounded-full transition-all"
-                    style={{ width: `${aiSummary?.task_completion_rate || 0}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm font-medium text-primary">
-                  {aiSummary?.task_completion_rate || 0}%
-                </span>
-              </div>
-            </div>
-          </div>
-          {aiSummary?.overdue_tasks && aiSummary.overdue_tasks > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">逾期任务</p>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-500" />
-                <span className="text-lg font-semibold text-red-600">{aiSummary.overdue_tasks}</span>
-              </div>
-            </div>
-          )}
-        </div>
+        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+          {aiSummary?.last_activity_summary || "暂无分析数据"}
+        </p>
       </div>
 
-      {aiSummary?.last_activity_summary && (
-        <div className="bg-card rounded-xl shadow-sm p-6 mb-8 border border-primary/5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">AI 总结</span>
-            </div>
-            <button
-              onClick={refreshAISummary}
-              disabled={refreshing}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
-              <span>刷新</span>
-            </button>
-          </div>
-          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-            {aiSummary.last_activity_summary}
-          </p>
+      <div className="bg-card rounded-xl shadow-sm p-6 mb-8">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-4">
+          <Zap className="w-4 h-4" />
+          <span>客户大脑对话</span>
         </div>
-      )}
+        
+        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+          {brainMessages.map((msg, index) => (
+            <div key={index} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-primary/10' : 'bg-muted/30'}`}>
+              <p className="text-xs text-muted-foreground mb-1">{msg.role === 'user' ? '用户' : 'AI'}</p>
+              <p className="text-sm">{msg.content}</p>
+            </div>
+          ))}
+          {brainMessages.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">开始与客户大脑对话...</p>
+          )}
+        </div>
+        
+        <div className="mt-4 pt-4 border-t border-border flex gap-2">
+          <input
+            type="text"
+            value={brainInput}
+            onChange={(e) => setBrainInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setBrainMessages([...brainMessages, { role: 'user', content: brainInput }, { role: 'ai', content: '正在分析中...' }]);
+                setBrainInput('');
+              }
+            }}
+            className="flex-1 bg-zinc-800 dark:bg-zinc-800 light:bg-gray-100 border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            placeholder="输入问题..."
+          />
+          <button
+            onClick={() => {
+              if (brainInput.trim()) {
+                setBrainMessages([...brainMessages, { role: 'user', content: brainInput }, { role: 'ai', content: '正在分析中...' }]);
+                setBrainInput('');
+              }
+            }}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+          >
+            发送
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-6">
@@ -579,36 +563,75 @@ export default function CustomerDetailPage() {
           </div>
 
           <div className="bg-card rounded-xl shadow-sm p-6">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-4">
-              <Folder className="w-4 h-4" />
-              <span>项目列表</span>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Folder className="w-4 h-4" />
+                <span>项目列表</span>
+              </div>
+              <button
+                onClick={() => {
+                  setNewProject({
+                    name: "",
+                    customer_id: id as string,
+                    status: "LEAD",
+                    budget: "",
+                    description: "",
+                  });
+                  setShowProjectModal(true);
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                <span>新建项目</span>
+              </button>
             </div>
             {projects.length > 0 ? (
               <div className="space-y-3">
                 {projects.map((project) => (
-                  <div key={project.id} className="p-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-between mb-2">
+                  <div key={project.id} className="p-4 rounded-xl bg-muted/30">
+                    <div className="flex items-center justify-between mb-3">
                       <p className="text-sm font-medium">{project.name}</p>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getProjectStatusClass(project.status)}`}>
+                      <span className={`px-2.5 py-1 text-xs font-medium rounded-lg ${getProjectStatusClass(project.status)}`}>
                         {getProjectStatusLabel(project.status)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      {project.budget && (
-                        <p className="text-xs text-amber-600">预算: {formatBudget(project.budget)}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        任务: {(project as any).task_count || 0}
-                      </p>
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <p className="text-muted-foreground mb-1">预计金额</p>
+                        <p className="font-medium text-amber-600">{formatBudget(project.budget) || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">更新时间</p>
+                        <p className="font-medium">{formatDate(project.updated_at)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">任务数</p>
+                        <p className="font-medium">{(project as any).task_count || 0}</p>
+                      </div>
                     </div>
-                    {project.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{truncateContent(project.description, 50)}</p>
-                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">暂无项目</p>
+              <div className="text-center py-8">
+                <Folder className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">暂无项目</p>
+                <button
+                  onClick={() => {
+                    setNewProject({
+                      name: "",
+                      customer_id: id as string,
+                      status: "LEAD",
+                      budget: "",
+                      description: "",
+                    });
+                    setShowProjectModal(true);
+                  }}
+                  className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  + 新建项目
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -709,6 +732,104 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       </div>
+
+      {showProjectModal && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowProjectModal(false);
+          }}
+        >
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-semibold">新建项目</h2>
+              <button
+                onClick={() => setShowProjectModal(false)}
+                className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {projectError && (
+                <div className="px-4 py-3 bg-red-500/10 text-red-600 rounded-xl text-sm">
+                  {projectError}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">项目名称 <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  placeholder="输入项目名称"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">所属客户</label>
+                <input
+                  type="text"
+                  value={customer.name}
+                  disabled
+                  className="w-full px-4 py-3 bg-zinc-800/50 border border-border rounded-xl text-muted-foreground"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">项目阶段 <span className="text-red-500">*</span></label>
+                <select
+                  value={newProject.status}
+                  onChange={(e) => setNewProject({ ...newProject, status: e.target.value as Project["status"] })}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                >
+                  <option value="LEAD">线索阶段</option>
+                  <option value="QUALIFIED">需求确认</option>
+                  <option value="PROPOSAL">方案设计</option>
+                  <option value="VERIFICATION">技术验证</option>
+                  <option value="NEGOTIATION">商务谈判</option>
+                  <option value="WON">已成交</option>
+                  <option value="LOST">售后维护</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">预计金额</label>
+                <input
+                  type="number"
+                  value={newProject.budget}
+                  onChange={(e) => setNewProject({ ...newProject, budget: e.target.value })}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">备注</label>
+                <textarea
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all h-20 resize-none"
+                  placeholder="输入备注信息"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-border">
+              <button
+                onClick={() => setShowProjectModal(false)}
+                className="px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateProject}
+                disabled={!newProject.name.trim() || creatingProject}
+                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {creatingProject ? "创建中..." : "创建项目"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

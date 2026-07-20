@@ -72,6 +72,7 @@ def create_customer(customer: CustomerCreate, db: Session = Depends(get_db), cur
         )
         db.add(db_contact)
         db.commit()
+        db.refresh(db_customer)
     
     return _get_customer_with_summary(db, db_customer)
 

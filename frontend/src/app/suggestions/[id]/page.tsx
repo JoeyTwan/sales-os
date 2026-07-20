@@ -358,7 +358,7 @@ export default function SuggestionDetailPage() {
                             prev.map((t, i) => (i === index ? { ...t, due_date: e.target.value || undefined } : t))
                           );
                         }}
-                        className="bg-transparent border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="bg-zinc-800 dark:bg-zinc-800 light:bg-gray-100 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                     </div>
                     <div className="flex gap-3">

@@ -3,12 +3,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, ListTodo, BookOpen, Settings, Sun, Moon, Monitor } from "lucide-react";
+import { LayoutDashboard, Users, ListTodo, BookOpen, Settings, Sun, Moon, Monitor, FolderOpen } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
 const menuItems = [
   { path: "/", icon: LayoutDashboard, label: "工作台" },
   { path: "/customers", icon: Users, label: "客户管理" },
+  { path: "/projects", icon: FolderOpen, label: "项目中心" },
   { path: "/tasks", icon: ListTodo, label: "任务管理" },
   { path: "/knowledge", icon: BookOpen, label: "知识库" },
   { path: "/settings", icon: Settings, label: "系统设置" },

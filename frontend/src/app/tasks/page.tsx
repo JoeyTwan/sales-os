@@ -13,6 +13,18 @@ interface Task {
   due_date: string | null;
   created_at: string;
   updated_at: string;
+  customer_id: string | null;
+  project_id: string | null;
+}
+
+interface Customer {
+  id: string;
+  name: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
 }
 
 type ViewMode = "list" | "calendar";
@@ -26,6 +38,8 @@ interface GroupedTasks {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -39,7 +53,35 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadTasks();
+    loadCustomers();
+    loadProjects();
   }, []);
+
+  const loadCustomers = async () => {
+    try {
+      const data = await apiGet<Customer[]>("/api/customers");
+      setCustomers(data);
+    } catch {}
+  };
+
+  const loadProjects = async () => {
+    try {
+      const data = await apiGet<Project[]>("/api/projects");
+      setProjects(data);
+    } catch {}
+  };
+
+  const getCustomerName = (customerId: string | null) => {
+    if (!customerId) return "暂无";
+    const customer = customers.find((c) => c.id === customerId);
+    return customer?.name || "暂无";
+  };
+
+  const getProjectName = (projectId: string | null) => {
+    if (!projectId) return "暂无";
+    const project = projects.find((p) => p.id === projectId);
+    return project?.name || "暂无";
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,8 +174,10 @@ export default function TasksPage() {
       case "HIGH":
         return "bg-red-500/10 text-red-600";
       case "MEDIUM":
-        return "bg-yellow-500/10 text-yellow-700";
+        return "bg-orange-500/10 text-orange-600";
       case "LOW":
+        return "bg-yellow-500/10 text-yellow-700";
+      default:
         return "bg-muted/50 text-muted-foreground";
     }
   };
@@ -143,9 +187,11 @@ export default function TasksPage() {
       case "HIGH":
         return "紧急且重要";
       case "MEDIUM":
-        return "重要不紧急";
+        return "重要非紧急";
       case "LOW":
-        return "一般";
+        return "紧急非重要";
+      default:
+        return "非紧急非重要";
     }
   };
 
@@ -156,9 +202,18 @@ export default function TasksPage() {
       case "MEDIUM":
         return "bg-orange-500";
       case "LOW":
+        return "bg-yellow-500";
+      default:
         return "bg-gray-500";
     }
   };
+
+  const priorityOptions = [
+    { value: "HIGH", label: "紧急且重要", color: "bg-red-500/10 text-red-600 border-red-500/30" },
+    { value: "MEDIUM", label: "重要非紧急", color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
+    { value: "LOW", label: "紧急非重要", color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" },
+    { value: "LOW", label: "非紧急非重要", color: "bg-gray-500/10 text-gray-600 border-gray-500/30" },
+  ];
 
   const getStatusLabel = (status: Task["status"]) => {
     switch (status) {
@@ -192,6 +247,18 @@ export default function TasksPage() {
     return date.toLocaleDateString("zh-CN", { year: "numeric", month: "long" });
   };
 
+  const isThisWeek = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayOfWeek = today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    date.setHours(0, 0, 0, 0);
+    return date >= monday && date <= sunday;
+  };
+
   const getCalendarDays = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -199,7 +266,7 @@ export default function TasksPage() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
 
-    const days: { date: Date; isToday: boolean; isSelected: boolean; tasks: Task[]; isCurrentMonth: boolean }[] = [];
+    const days: { date: Date; isToday: boolean; isSelected: boolean; tasks: Task[]; isCurrentMonth: boolean; isThisWeek: boolean }[] = [];
 
     const startPadding = firstDay.getDay();
     for (let i = startPadding - 1; i >= 0; i--) {
@@ -210,6 +277,7 @@ export default function TasksPage() {
         isSelected: false,
         tasks: [],
         isCurrentMonth: false,
+        isThisWeek: isThisWeek(new Date(date)),
       });
     }
 
@@ -233,6 +301,7 @@ export default function TasksPage() {
         isSelected: selectedDate?.getTime() === date.getTime(),
         tasks: dayTasks,
         isCurrentMonth: true,
+        isThisWeek: isThisWeek(new Date(date)),
       });
     }
 
@@ -245,6 +314,7 @@ export default function TasksPage() {
         isSelected: false,
         tasks: [],
         isCurrentMonth: false,
+        isThisWeek: isThisWeek(new Date(date)),
       });
     }
 
@@ -350,9 +420,10 @@ export default function TasksPage() {
                       <p className={`text-sm ${task.status === "DONE" ? "line-through text-muted-foreground" : ""}`}>
                         {task.title}
                       </p>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
-                      )}
+                      <div className="flex flex-col gap-0.5 mt-1">
+                        <span className="text-xs text-muted-foreground">客户：{getCustomerName(task.customer_id)}</span>
+                        <span className="text-xs text-muted-foreground">项目：{getProjectName(task.project_id)}</span>
+                      </div>
                       {task.due_date && (
                         <div className="flex items-center gap-1 mt-2">
                           <Clock className="w-3 h-3 text-muted-foreground" />
@@ -409,9 +480,10 @@ export default function TasksPage() {
                       <p className={`text-sm ${task.status === "DONE" ? "line-through text-muted-foreground" : ""}`}>
                         {task.title}
                       </p>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
-                      )}
+                      <div className="flex flex-col gap-0.5 mt-1">
+                        <span className="text-xs text-muted-foreground">客户：{getCustomerName(task.customer_id)}</span>
+                        <span className="text-xs text-muted-foreground">项目：{getProjectName(task.project_id)}</span>
+                      </div>
                       {task.due_date && (
                         <div className="flex items-center gap-1 mt-2">
                           <Clock className="w-3 h-3 text-muted-foreground" />
@@ -468,9 +540,10 @@ export default function TasksPage() {
                       <p className={`text-sm ${task.status === "DONE" ? "line-through text-muted-foreground" : ""}`}>
                         {task.title}
                       </p>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
-                      )}
+                      <div className="flex flex-col gap-0.5 mt-1">
+                        <span className="text-xs text-muted-foreground">客户：{getCustomerName(task.customer_id)}</span>
+                        <span className="text-xs text-muted-foreground">项目：{getProjectName(task.project_id)}</span>
+                      </div>
                       {task.due_date && (
                         <div className="flex items-center gap-1 mt-2">
                           <Clock className="w-3 h-3 text-muted-foreground" />
@@ -519,6 +592,10 @@ export default function TasksPage() {
                     </button>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm line-through text-muted-foreground">{task.title}</p>
+                      <div className="flex flex-col gap-0.5 mt-1">
+                        <span className="text-xs text-muted-foreground">客户：{getCustomerName(task.customer_id)}</span>
+                        <span className="text-xs text-muted-foreground">项目：{getProjectName(task.project_id)}</span>
+                      </div>
                       {task.due_date && (
                         <div className="flex items-center gap-1 mt-2">
                           <Clock className="w-3 h-3 text-muted-foreground" />
@@ -576,24 +653,26 @@ export default function TasksPage() {
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((day) => (
                 <div
                   key={day.date.toDateString()}
                   onClick={() => setSelectedDate(day.isCurrentMonth ? day.date : null)}
-                  className={`aspect-square rounded-lg p-1.5 flex flex-col transition-colors cursor-pointer ${
+                  className={`aspect-square rounded-lg flex flex-col items-center justify-center transition-colors cursor-pointer ${
                     day.isSelected
                       ? "bg-primary text-primary-foreground"
                       : day.isToday
-                      ? "bg-blue-500/20"
+                      ? "bg-primary"
+                      : day.isThisWeek && day.isCurrentMonth
+                      ? "bg-muted/30"
                       : day.isCurrentMonth
                       ? "hover:bg-muted/30"
-                      : "bg-muted/10 text-muted-foreground/50"
+                      : "bg-transparent"
                   }`}
                 >
                   <span
                     className={`text-sm font-medium ${
-                      day.isSelected ? "text-primary-foreground" : day.isToday ? "text-blue-500 font-semibold" : ""
+                      day.isSelected ? "text-primary-foreground" : day.isToday ? "text-primary-foreground font-semibold" : day.isCurrentMonth ? "text-primary" : "text-muted-foreground opacity-40"
                     }`}
                   >
                     {day.date.getDate()}
@@ -653,9 +732,10 @@ export default function TasksPage() {
                         <p className={`text-sm ${task.status === "DONE" ? "line-through text-muted-foreground" : ""}`}>
                           {task.title}
                         </p>
-                        {task.description && (
-                          <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
-                        )}
+                        <div className="flex flex-col gap-0.5 mt-1">
+                          <span className="text-xs text-muted-foreground">客户：{getCustomerName(task.customer_id)}</span>
+                          <span className="text-xs text-muted-foreground">项目：{getProjectName(task.project_id)}</span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityClass(task.priority)}`}>
@@ -715,20 +795,29 @@ export default function TasksPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">优先级</label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex gap-1 bg-zinc-800 rounded-lg p-1">
                     {[
-                      { value: "HIGH", label: "紧急且重要", color: "bg-red-500/10 text-red-600 border-red-500/30" },
-                      { value: "MEDIUM", label: "重要不紧急", color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
-                      { value: "LOW", label: "一般", color: "bg-gray-500/10 text-gray-600 border-gray-500/30" },
+                      { value: "HIGH", label: "紧急且重要", activeColor: "bg-red-500 text-white" },
+                      { value: "MEDIUM", label: "重要非紧急", activeColor: "bg-orange-500 text-white" },
+                      { value: "LOW", label: "紧急非重要", activeColor: "bg-yellow-500 text-white" },
+                      { value: "LOW", label: "非紧急非重要", activeColor: "bg-gray-500 text-white" },
                     ].map((option) => (
                       <button
-                        key={option.value}
+                        key={option.value + option.label}
                         type="button"
                         onClick={() => setNewTask({ ...newTask, priority: option.value as Task["priority"] })}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
+                        onWheel={(e) => {
+                          e.preventDefault();
+                          const options = ["HIGH", "MEDIUM", "LOW", "LOW"];
+                          const currentIndex = options.findIndex(o => o === newTask.priority);
+                          const direction = e.deltaY > 0 ? 1 : -1;
+                          const newIndex = (currentIndex + direction + options.length) % options.length;
+                          setNewTask({ ...newTask, priority: options[newIndex] as Task["priority"] });
+                        }}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                           newTask.priority === option.value
-                            ? `${option.color} ring-2 ring-offset-2 ring-primary/20`
-                            : "bg-muted/20 text-muted-foreground border-transparent hover:bg-muted/40"
+                            ? `${option.activeColor} shadow-lg`
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {option.label}
@@ -743,7 +832,7 @@ export default function TasksPage() {
                     type="date"
                     value={newTask.due_date}
                     onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                    className="w-full bg-zinc-800 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full bg-zinc-800 dark:bg-zinc-800 light:bg-gray-100 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>

@@ -131,13 +131,13 @@ export default function DashboardPage() {
   const bottomInputRef = useRef<HTMLDivElement>(null);
   
   const projectStatusOptions = [
-    { value: "LEAD", label: "线索" },
+    { value: "LEAD", label: "线索阶段" },
     { value: "QUALIFIED", label: "需求确认" },
     { value: "PROPOSAL", label: "方案设计" },
     { value: "VERIFICATION", label: "技术验证" },
     { value: "NEGOTIATION", label: "商务谈判" },
-    { value: "WON", label: "成交" },
-    { value: "PAUSED", label: "暂停" },
+    { value: "WON", label: "已成交" },
+    { value: "LOST", label: "售后维护" },
   ];
 
   useEffect(() => {
@@ -566,34 +566,42 @@ export default function DashboardPage() {
       <div className="bg-card rounded-2xl shadow-sm p-6 mb-8">
         <h2 className="text-sm font-semibold text-muted-foreground mb-6">今日重点</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
-              <ListTodo className="w-4 h-4 text-primary" />
+          <Link href="/tasks?filter=today" className="block cursor-pointer">
+            <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+                <ListTodo className="w-4 h-4 text-primary" />
+              </div>
+              <p className="text-4xl font-bold">{stats.todayTasks}</p>
+              <p className="text-xs text-muted-foreground mt-2">今日待办</p>
             </div>
-            <p className="text-4xl font-bold">{stats.todayTasks}</p>
-            <p className="text-xs text-muted-foreground mt-2">今日待办</p>
-          </div>
-          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
-            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center mb-3">
-              <User className="w-4 h-4 text-green-500" />
+          </Link>
+          <Link href="/customers?filter=followup" className="block cursor-pointer">
+            <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center mb-3">
+                <User className="w-4 h-4 text-green-500" />
+              </div>
+              <p className="text-4xl font-bold">{stats.needFollowUpCustomers}</p>
+              <p className="text-xs text-muted-foreground mt-2">待跟进客户</p>
             </div>
-            <p className="text-4xl font-bold">{stats.needFollowUpCustomers}</p>
-            <p className="text-xs text-muted-foreground mt-2">待跟进客户</p>
-          </div>
-          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3">
-              <Clock className="w-4 h-4 text-amber-500" />
+          </Link>
+          <Link href="/tasks?filter=overdue" className="block cursor-pointer">
+            <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3">
+                <Clock className="w-4 h-4 text-amber-500" />
+              </div>
+              <p className="text-4xl font-bold text-amber-600">{stats.upcomingOverdue}</p>
+              <p className="text-xs text-muted-foreground mt-2">超期任务</p>
             </div>
-            <p className="text-4xl font-bold text-amber-600">{stats.upcomingOverdue}</p>
-            <p className="text-xs text-muted-foreground mt-2">即将超期</p>
-          </div>
-          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
-              <Sparkles className="w-4 h-4 text-blue-500" />
+          </Link>
+          <Link href="/customers?filter=new" className="block cursor-pointer">
+            <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
+                <Sparkles className="w-4 h-4 text-blue-500" />
+              </div>
+              <p className="text-4xl font-bold">{stats.recentNewCustomers}</p>
+              <p className="text-xs text-muted-foreground mt-2">新增客户</p>
             </div>
-            <p className="text-4xl font-bold">{stats.recentNewCustomers}</p>
-            <p className="text-xs text-muted-foreground mt-2">新增客户</p>
-          </div>
+          </Link>
         </div>
       </div>
 
@@ -1005,7 +1013,7 @@ export default function DashboardPage() {
                               newTasks[index].due_date = e.target.value;
                               setEditableTasks(newTasks);
                             }}
-                            className="px-3 py-1.5 bg-muted/50 border border-border rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-primary/20"
+                            className="px-3 py-1.5 bg-zinc-800 dark:bg-zinc-800 light:bg-gray-100 border border-border rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-primary/20"
                           />
                           <select
                             value={task.priority}
@@ -1136,7 +1144,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex items-center bg-zinc-800 rounded-full h-[56px] px-4">
+            <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-full h-[56px] px-4">
               <div className="relative">
                 <button
                   type="button"

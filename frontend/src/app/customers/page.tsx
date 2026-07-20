@@ -60,9 +60,14 @@ export default function CustomersPage() {
     contact_position: "",
     summary: "",
     level: "MEDIUM" as Customer["level"],
+    status: "ACTIVE" as Customer["status"],
     remark: "",
   });
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateCustomers, setDuplicateCustomers] = useState<Customer[]>([]);
+  const [pendingCustomer, setPendingCustomer] = useState<typeof newCustomer | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -77,9 +82,75 @@ export default function CustomersPage() {
     }
   };
 
+  const calculateSimilarity = (str1: string, str2: string) => {
+    const s1 = str1.toLowerCase().replace(/\s/g, "");
+    const s2 = str2.toLowerCase().replace(/\s/g, "");
+    
+    if (s1 === s2) return 100;
+    
+    const longer = s1.length > s2.length ? s1 : s2;
+    const shorter = s1.length > s2.length ? s2 : s1;
+    
+    if (longer.length === 0) return 100;
+    
+    const longerLength = longer.length;
+    const editDistance = (() => {
+      const dp: number[][] = [];
+      for (let i = 0; i <= shorter.length; i++) {
+        dp[i] = [i];
+      }
+      for (let j = 0; j <= longer.length; j++) {
+        dp[0][j] = j;
+      }
+      for (let i = 1; i <= shorter.length; i++) {
+        for (let j = 1; j <= longer.length; j++) {
+          const cost = shorter.charAt(i - 1) === longer.charAt(j - 1) ? 0 : 1;
+          dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + cost
+          );
+        }
+      }
+      return dp[shorter.length][longer.length];
+    })();
+    
+    return Math.round(((longerLength - editDistance) / longerLength) * 100);
+  };
+
   const handleCreateCustomer = async () => {
     if (!newCustomer.name.trim()) return;
     setCreating(true);
+    setError("");
+    
+    const name = newCustomer.name.trim();
+    
+    let allCustomers = customers;
+    try {
+      allCustomers = await apiGet<Customer[]>("/api/customers");
+      setCustomers(allCustomers);
+    } catch {}
+    
+    const exactMatch = allCustomers.find(c => c.name.trim() === name);
+    if (exactMatch) {
+      setError("该客户已存在");
+      setCreating(false);
+      return;
+    }
+    
+    const similarCustomers = allCustomers.filter(c => {
+      const similarity = calculateSimilarity(name, c.name.trim());
+      return similarity >= 80 && c.name.trim() !== name;
+    });
+    
+    if (similarCustomers.length > 0) {
+      setDuplicateCustomers(similarCustomers);
+      setPendingCustomer(newCustomer);
+      setShowDuplicateWarning(true);
+      setCreating(false);
+      return;
+    }
+    
     try {
       await apiPost("/api/customers", newCustomer);
       setShowModal(false);
@@ -88,11 +159,41 @@ export default function CustomersPage() {
         contact_name: "",
         contact_position: "",
         summary: "",
-        level: "MEDIUM",
+        level: "MEDIUM" as Customer["level"],
+        status: "ACTIVE" as Customer["status"],
         remark: "",
       });
       loadCustomers();
-    } catch {} finally {
+    } catch (err) {
+      setError("创建客户失败，请稍后重试");
+      console.error("Create customer error:", err);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleContinueCreate = async () => {
+    if (!pendingCustomer) return;
+    setCreating(true);
+    try {
+      await apiPost("/api/customers", pendingCustomer);
+      setShowModal(false);
+      setShowDuplicateWarning(false);
+      setPendingCustomer(null);
+      setNewCustomer({
+        name: "",
+        contact_name: "",
+        contact_position: "",
+        summary: "",
+        level: "MEDIUM" as Customer["level"],
+        status: "ACTIVE" as Customer["status"],
+        remark: "",
+      });
+      loadCustomers();
+    } catch (err) {
+      setError("创建客户失败，请稍后重试");
+      console.error("Create customer error:", err);
+    } finally {
       setCreating(false);
     }
   };
@@ -111,11 +212,11 @@ export default function CustomersPage() {
   const getLevelLabel = (level: Customer["level"]) => {
     switch (level) {
       case "HIGH":
-        return "高";
+        return "高价值";
       case "MEDIUM":
-        return "中";
+        return "中价值";
       case "LOW":
-        return "低";
+        return "低价值";
     }
   };
 
@@ -188,7 +289,7 @@ export default function CustomersPage() {
     return result;
   }, [customers, searchQuery, selectedLevel, selectedTimeRange, selectedStage]);
 
-  const stages = ["线索", "需求确认", "方案设计", "技术验证", "商务谈判", "成交"];
+  const stages = ["线索阶段", "需求确认", "方案设计", "技术验证", "商务谈判", "已成交", "售后维护"];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -389,6 +490,11 @@ export default function CustomersPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {error && (
+                <div className="px-4 py-3 bg-red-500/10 text-red-600 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
               <div>
                 <label className="block text-sm text-muted-foreground mb-2 font-medium">公司名称</label>
                 <input
@@ -433,17 +539,28 @@ export default function CustomersPage() {
               </div>
               <div>
                 <label className="block text-sm text-muted-foreground mb-2 font-medium">客户价值</label>
-                <div className="flex gap-4">
+                <div className="flex gap-1 bg-zinc-800 rounded-lg p-1">
                   {(["HIGH", "MEDIUM", "LOW"] as const).map((level) => (
-                    <label key={level} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={newCustomer.level === level}
-                        onChange={() => setNewCustomer({ ...newCustomer, level })}
-                        className="w-4 h-4 text-primary border-border"
-                      />
-                      <span className="text-sm">{getLevelLabel(level)}</span>
-                    </label>
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setNewCustomer({ ...newCustomer, level })}
+                      onWheel={(e) => {
+                        e.preventDefault();
+                        const levels: Customer["level"][] = ["HIGH", "MEDIUM", "LOW"];
+                        const currentIndex = levels.findIndex(l => l === newCustomer.level);
+                        const direction = e.deltaY > 0 ? 1 : -1;
+                        const newIndex = (currentIndex + direction + levels.length) % levels.length;
+                        setNewCustomer({ ...newCustomer, level: levels[newIndex] });
+                      }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        newCustomer.level === level
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {getLevelLabel(level)}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -471,6 +588,61 @@ export default function CustomersPage() {
               >
                 {creating ? "创建中..." : "创建客户"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDuplicateWarning && (
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDuplicateWarning(false); }}
+        >
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-semibold">发现可能重复客户</h2>
+              <button
+                onClick={() => setShowDuplicateWarning(false)}
+                className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-muted-foreground mb-4">以下客户与您输入的公司名称相似度超过80%：</p>
+              <div className="space-y-2 mb-6">
+                {duplicateCustomers.map((customer) => (
+                  <Link
+                    key={customer.id}
+                    href={`/customers/${customer.id}`}
+                    onClick={() => {
+                      setShowDuplicateWarning(false);
+                      setShowModal(false);
+                    }}
+                    className="block p-3 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
+                  >
+                    <p className="text-sm font-medium">{customer.name}</p>
+                  </Link>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDuplicateWarning(false);
+                    setShowModal(false);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium transition-all hover:bg-muted/80"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleContinueCreate}
+                  disabled={creating}
+                  className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50"
+                >
+                  继续创建
+                </button>
+              </div>
             </div>
           </div>
         </div>
