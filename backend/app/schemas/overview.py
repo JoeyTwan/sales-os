@@ -46,6 +46,8 @@ class ProjectOverviewContact(BaseModel):
     id: str
     name: str
     position: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
     role: Optional[str] = None
     remark: Optional[str] = None
 
@@ -59,12 +61,29 @@ class ProjectOverviewTask(BaseModel):
 
 
 class ProjectOverviewActivity(BaseModel):
+    id: str
     content: str
+    source: str
     activity_date: date
+
+
+class ProjectOverviewStatistics(BaseModel):
+    contact_count: int
+    task_count: int
+    activity_count: int
+
+
+class ProjectOverviewCustomer(BaseModel):
+    id: str
+    name: str
+    level: str
+    status: str
 
 
 class ProjectOverview(BaseModel):
     project: dict
+    customer: ProjectOverviewCustomer
     contacts: List[ProjectOverviewContact]
     tasks: List[ProjectOverviewTask]
     activities: List[ProjectOverviewActivity]
+    statistics: ProjectOverviewStatistics

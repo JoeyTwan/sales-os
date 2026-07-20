@@ -11,8 +11,10 @@ class ProjectContactBase(BaseModel):
     remark: Optional[str] = Field(None, description="备注")
 
 
-class ProjectContactCreate(ProjectContactBase):
-    pass
+class ProjectContactCreate(BaseModel):
+    contact_id: str
+    role: Optional[str] = Field(None, description="项目角色")
+    remark: Optional[str] = Field(None, description="备注")
 
 
 class ProjectContactUpdate(BaseModel):
@@ -20,10 +22,15 @@ class ProjectContactUpdate(BaseModel):
     remark: Optional[str] = Field(None, description="备注")
 
 
-class ProjectContactOut(ProjectContactBase):
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
+class ProjectContactOut(BaseModel):
+    id: str
+    contact_id: str
+    name: str
+    position: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    remark: Optional[str] = None
 
     class Config:
         from_attributes = True
