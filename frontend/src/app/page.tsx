@@ -20,6 +20,8 @@ interface Task {
   priority: "HIGH" | "MEDIUM" | "LOW";
   due_date: string;
   is_pinned?: boolean;
+  customer_name?: string;
+  project_name?: string;
 }
 
 interface CustomerAISummary {
@@ -120,7 +122,7 @@ export default function DashboardPage() {
   const [showTaskMenu, setShowTaskMenu] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editableCustomer, setEditableCustomer] = useState<CustomerSuggestion | null>(null);
-  const [editableContact, setEditableContact] = useState<{ name: string; position: string } | null>(null);
+  const [editableContact, setEditableContact] = useState<{ name: string; position: string; phone: string } | null>(null);
   const [editableProject, setEditableProject] = useState<ProjectSuggestion | null>(null);
   const [editableTasks, setEditableTasks] = useState<TaskSuggestion[]>([]);
   const [editableActivity, setEditableActivity] = useState("");
@@ -201,7 +203,7 @@ export default function DashboardPage() {
       
       if (data.contacts.length > 0) {
         const contact = data.contacts[0];
-        setEditableContact({ name: contact.name || "", position: contact.position || "" });
+        setEditableContact({ name: contact.name || "", position: contact.position || "", phone: contact.phone || "" });
       } else {
         setEditableContact(null);
       }
@@ -306,7 +308,7 @@ export default function DashboardPage() {
     if (date.toDateString() === tomorrow.toDateString()) {
       return "明天";
     }
-    return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+    return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric", timeZone: "Asia/Shanghai" });
   };
 
   const formatDateTime = (dateStr: string) => {
@@ -318,7 +320,7 @@ export default function DashboardPage() {
     if (days === 0) return "今天";
     if (days === 1) return "昨天";
     if (days < 7) return `${days}天前`;
-    return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+    return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric", timeZone: "Asia/Shanghai" });
   };
 
   const getStageClass = (stage: string) => {
@@ -543,7 +545,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen pb-32">
-      <div className="mb-8">
+      <div className="mt-8 mb-8">
         <h1 className="text-2xl font-semibold mb-2">工作台</h1>
         <p className="text-sm text-muted-foreground">欢迎回来，今天继续加油</p>
       </div>
@@ -676,6 +678,18 @@ export default function DashboardPage() {
                           </p>
                         )}
                         <div className="flex items-center gap-3 mt-3">
+                          {task.customer_name && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <User className="w-3 h-3" />
+                              {task.customer_name}
+                            </span>
+                          )}
+                          {task.project_name && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Folder className="w-3 h-3" />
+                              {task.project_name}
+                            </span>
+                          )}
                           {task.due_date && (
                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Calendar className="w-3 h-3" />
@@ -841,30 +855,51 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-3">
                     {editableCustomer && (
-                      <input
-                        type="text"
-                        value={editableCustomer.name}
-                        onChange={(e) => setEditableCustomer({ ...editableCustomer, name: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-medium"
-                        placeholder="公司名称"
-                      />
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">公司名称</label>
+                        <input
+                          type="text"
+                          value={editableCustomer.name}
+                          onChange={(e) => setEditableCustomer({ ...editableCustomer, name: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-medium"
+                          placeholder="公司名称"
+                        />
+                      </div>
                     )}
                     {editableContact && (
                       <>
-                        <input
-                          type="text"
-                          value={editableContact.name}
-                          onChange={(e) => setEditableContact({ ...editableContact, name: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                          placeholder="联系人姓名"
-                        />
-                        <input
-                          type="text"
-                          value={editableContact.position}
-                          onChange={(e) => setEditableContact({ ...editableContact, position: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                          placeholder="职位"
-                        />
+                        <div>
+                          <label className="block text-xs text-muted-foreground mb-1">联系人</label>
+                          <input
+                            type="text"
+                            value={editableContact.name}
+                            onChange={(e) => setEditableContact({ ...editableContact, name: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                            placeholder="联系人姓名"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-muted-foreground mb-1">职位</label>
+                            <input
+                              type="text"
+                              value={editableContact.position}
+                              onChange={(e) => setEditableContact({ ...editableContact, position: e.target.value })}
+                              className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                              placeholder="职位"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-muted-foreground mb-1">电话</label>
+                            <input
+                              type="text"
+                              value={editableContact.phone}
+                              onChange={(e) => setEditableContact({ ...editableContact, phone: e.target.value })}
+                              className="w-full px-4 py-2.5 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                              placeholder="电话号码"
+                            />
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
@@ -1068,7 +1103,7 @@ export default function DashboardPage() {
       >
         <div className="max-w-4xl mx-auto">
           <form onSubmit={handleSubmit}>
-            <div className="flex items-end gap-3 bg-muted/30 rounded-2xl p-3">
+            <div className="flex items-center gap-3 bg-muted/30 rounded-2xl p-3">
               <div className="relative">
                 <button
                   type="button"
@@ -1109,7 +1144,7 @@ export default function DashboardPage() {
                   <select
                     value={inputMode}
                     onChange={(e) => setInputMode(e.target.value as InputMode)}
-                    className="bg-muted/50 border border-border rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary/20"
+                    className="bg-foreground/10 border border-foreground/20 text-foreground rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary/20"
                   >
                     {inputModes.map((mode) => (
                       <option key={mode.value} value={mode.value}>
@@ -1123,7 +1158,7 @@ export default function DashboardPage() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="老板，有什么可以帮忙的？"
-                  className="w-full bg-transparent border-none outline-none resize-none text-sm leading-relaxed placeholder:text-muted-foreground/40 h-10 pl-24"
+                  className="w-full bg-transparent border-none outline-none resize-none text-sm leading-relaxed placeholder:text-muted-foreground/40 pl-24"
                   rows={1}
                 />
               </div>

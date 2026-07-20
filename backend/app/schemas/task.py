@@ -45,6 +45,8 @@ class TaskOut(TaskBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    customer_name: Optional[str] = None
+    project_name: Optional[str] = None
 
     class Config:
         from_attributes = True
