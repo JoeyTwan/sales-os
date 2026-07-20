@@ -41,6 +41,16 @@ export default function TasksPage() {
     loadTasks();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const loadTasks = async () => {
     try {
       const data = await apiGet<Task[]>("/api/tasks");
@@ -131,11 +141,22 @@ export default function TasksPage() {
   const getPriorityLabel = (priority: Task["priority"]) => {
     switch (priority) {
       case "HIGH":
-        return "高";
+        return "紧急且重要";
       case "MEDIUM":
-        return "中";
+        return "重要不紧急";
       case "LOW":
-        return "低";
+        return "一般";
+    }
+  };
+
+  const getPriorityColorClass = (priority: Task["priority"]) => {
+    switch (priority) {
+      case "HIGH":
+        return "bg-red-500";
+      case "MEDIUM":
+        return "bg-orange-500";
+      case "LOW":
+        return "bg-gray-500";
     }
   };
 
@@ -521,7 +542,7 @@ export default function TasksPage() {
       )}
 
       {viewMode === "calendar" && (
-        <div className="space-y-6">
+        <div className="space-y-6 overflow-x-hidden">
           <div className="bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
               <button
@@ -555,24 +576,24 @@ export default function TasksPage() {
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1.5">
               {calendarDays.map((day) => (
                 <div
                   key={day.date.toDateString()}
                   onClick={() => setSelectedDate(day.isCurrentMonth ? day.date : null)}
-                  className={`aspect-square rounded-lg p-2 flex flex-col transition-colors cursor-pointer ${
+                  className={`aspect-square rounded-lg p-1.5 flex flex-col transition-colors cursor-pointer ${
                     day.isSelected
                       ? "bg-primary text-primary-foreground"
                       : day.isToday
-                      ? "bg-primary/10"
+                      ? "bg-blue-500/20"
                       : day.isCurrentMonth
                       ? "hover:bg-muted/30"
-                      : "text-muted-foreground/50"
+                      : "bg-muted/10 text-muted-foreground/50"
                   }`}
                 >
                   <span
-                    className={`text-xs font-medium ${
-                      day.isSelected ? "text-primary-foreground" : day.isToday ? "text-primary" : ""
+                    className={`text-sm font-medium ${
+                      day.isSelected ? "text-primary-foreground" : day.isToday ? "text-blue-500 font-semibold" : ""
                     }`}
                   >
                     {day.date.getDate()}
@@ -653,7 +674,10 @@ export default function TasksPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+        >
           <div className="bg-card rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">新建任务</h2>
@@ -688,18 +712,29 @@ export default function TasksPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">优先级</label>
-                  <select
-                    value={newTask.priority}
-                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as Task["priority"] })}
-                    className="w-full bg-transparent border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="HIGH">高</option>
-                    <option value="MEDIUM">中</option>
-                    <option value="LOW">低</option>
-                  </select>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "HIGH", label: "紧急且重要", color: "bg-red-500/10 text-red-600 border-red-500/30" },
+                      { value: "MEDIUM", label: "重要不紧急", color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
+                      { value: "LOW", label: "一般", color: "bg-gray-500/10 text-gray-600 border-gray-500/30" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setNewTask({ ...newTask, priority: option.value as Task["priority"] })}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
+                          newTask.priority === option.value
+                            ? `${option.color} ring-2 ring-offset-2 ring-primary/20`
+                            : "bg-muted/20 text-muted-foreground border-transparent hover:bg-muted/40"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -708,7 +743,7 @@ export default function TasksPage() {
                     type="date"
                     value={newTask.due_date}
                     onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                    className="w-full bg-transparent border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full bg-zinc-800 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>

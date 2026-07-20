@@ -152,6 +152,19 @@ export default function DashboardPage() {
     loadCustomers();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowModal(false);
+        setEditingTask(null);
+        setShowTaskMenu(null);
+        setShowUploadMenu(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const loadActivities = async () => {
     try {
       const data = await apiGet<Activity[]>("/api/activities");
@@ -553,45 +566,33 @@ export default function DashboardPage() {
       <div className="bg-card rounded-2xl shadow-sm p-6 mb-8">
         <h2 className="text-sm font-semibold text-muted-foreground mb-6">今日重点</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-muted/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <ListTodo className="w-4 h-4 text-primary" />
-              </div>
-              <span className="text-xs text-muted-foreground">今日待办</span>
+          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+              <ListTodo className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-2xl font-bold">{stats.todayTasks}</p>
-            <p className="text-xs text-muted-foreground mt-1">今天要完成的任务</p>
+            <p className="text-4xl font-bold">{stats.todayTasks}</p>
+            <p className="text-xs text-muted-foreground mt-2">今日待办</p>
           </div>
-          <div className="bg-muted/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                <User className="w-4 h-4 text-green-500" />
-              </div>
-              <span className="text-xs text-muted-foreground">待跟进客户</span>
+          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center mb-3">
+              <User className="w-4 h-4 text-green-500" />
             </div>
-            <p className="text-2xl font-bold">{stats.needFollowUpCustomers}</p>
-            <p className="text-xs text-muted-foreground mt-1">需要联系的客户</p>
+            <p className="text-4xl font-bold">{stats.needFollowUpCustomers}</p>
+            <p className="text-xs text-muted-foreground mt-2">待跟进客户</p>
           </div>
-          <div className="bg-muted/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <Clock className="w-4 h-4 text-amber-500" />
-              </div>
-              <span className="text-xs text-muted-foreground">即将超期</span>
+          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center mb-3">
+              <Clock className="w-4 h-4 text-amber-500" />
             </div>
-            <p className="text-2xl font-bold text-amber-600">{stats.upcomingOverdue}</p>
-            <p className="text-xs text-muted-foreground mt-1">3天内到期的任务</p>
+            <p className="text-4xl font-bold text-amber-600">{stats.upcomingOverdue}</p>
+            <p className="text-xs text-muted-foreground mt-2">即将超期</p>
           </div>
-          <div className="bg-muted/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-blue-500" />
-              </div>
-              <span className="text-xs text-muted-foreground">新增客户</span>
+          <div className="bg-muted/30 rounded-xl p-4 flex flex-col items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
+              <Sparkles className="w-4 h-4 text-blue-500" />
             </div>
-            <p className="text-2xl font-bold">{stats.recentNewCustomers}</p>
-            <p className="text-xs text-muted-foreground mt-1">最近7天新增</p>
+            <p className="text-4xl font-bold">{stats.recentNewCustomers}</p>
+            <p className="text-xs text-muted-foreground mt-2">新增客户</p>
           </div>
         </div>
       </div>
@@ -822,7 +823,10 @@ export default function DashboardPage() {
       </div>
 
       {showModal && analyzeResult && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
+        >
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-border/50 flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -1054,7 +1058,10 @@ export default function DashboardPage() {
       )}
 
       {editingTask && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingTask(null); }}
+        >
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between p-5 border-b border-border">
               <h2 className="text-lg font-semibold">编辑任务</h2>
@@ -1103,12 +1110,38 @@ export default function DashboardPage() {
       >
         <div className="max-w-4xl mx-auto">
           <form onSubmit={handleSubmit}>
-            <div className="flex items-center gap-3 bg-muted/30 rounded-2xl p-3">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex gap-1 bg-zinc-800 rounded-lg p-1">
+                {inputModes.map((mode) => (
+                  <button
+                    key={mode.value}
+                    type="button"
+                    onClick={() => setInputMode(mode.value)}
+                    onWheel={(e) => {
+                      e.preventDefault();
+                      const currentIndex = inputModes.findIndex(m => m.value === inputMode);
+                      const direction = e.deltaY > 0 ? 1 : -1;
+                      const newIndex = (currentIndex + direction + inputModes.length) % inputModes.length;
+                      setInputMode(inputModes[newIndex].value);
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      inputMode === mode.value
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center bg-zinc-800 rounded-full h-[56px] px-4">
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowUploadMenu(!showUploadMenu)}
-                  className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-muted/50 transition-colors"
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-700 transition-colors"
                 >
                   <Plus className="w-5 h-5 text-muted-foreground" />
                 </button>
@@ -1139,41 +1172,25 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="flex-1 relative">
-                <div className="absolute left-0 top-1/2 -translate-y-1/2">
-                  <select
-                    value={inputMode}
-                    onChange={(e) => setInputMode(e.target.value as InputMode)}
-                    className="bg-foreground/10 border border-foreground/20 text-foreground rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary/20"
-                  >
-                    {inputModes.map((mode) => (
-                      <option key={mode.value} value={mode.value}>
-                        {mode.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <textarea
-                  ref={textareaRef}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="老板，有什么可以帮忙的？"
-                  className="w-full bg-transparent border-none outline-none resize-none text-sm leading-relaxed placeholder:text-muted-foreground/40 pl-24"
-                  rows={1}
-                />
-              </div>
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="老板，有什么可以帮忙的？"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-sm leading-relaxed placeholder:text-muted-foreground/40"
+                rows={1}
+              />
 
               <button
                 type="submit"
                 disabled={!content.trim() || sending}
-                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                <span>{sending ? "分析中..." : "分析"}</span>
               </button>
             </div>
           </form>
