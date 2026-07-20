@@ -5,7 +5,17 @@ from sqlalchemy.sql import func
 
 from ..database import Base
 
-ProjectStatus = Enum("LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST", name="project_status")
+ProjectStatus = Enum(
+    "LEAD",
+    "NEEDS_CONFIRMATION",
+    "SOLUTION_DESIGN",
+    "TECH_VALIDATION",
+    "BUSINESS_NEGOTIATION",
+    "WON",
+    "AFTER_SALE",
+    "LOST",
+    name="project_status"
+)
 
 
 class Project(Base):
@@ -16,7 +26,7 @@ class Project(Base):
     customer_id = Column(String(36), ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    budget = Column(Integer, nullable=True)
+    amount = Column(Integer, nullable=True)
     status = Column(ProjectStatus, nullable=False, default="LEAD")
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.current_timestamp(), onupdate=func.current_timestamp())

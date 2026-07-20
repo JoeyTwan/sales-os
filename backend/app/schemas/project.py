@@ -7,10 +7,12 @@ from pydantic import BaseModel, Field
 
 class ProjectStatus(str, Enum):
     LEAD = "LEAD"
-    QUALIFIED = "QUALIFIED"
-    PROPOSAL = "PROPOSAL"
-    NEGOTIATION = "NEGOTIATION"
+    NEEDS_CONFIRMATION = "NEEDS_CONFIRMATION"
+    SOLUTION_DESIGN = "SOLUTION_DESIGN"
+    TECH_VALIDATION = "TECH_VALIDATION"
+    BUSINESS_NEGOTIATION = "BUSINESS_NEGOTIATION"
     WON = "WON"
+    AFTER_SALE = "AFTER_SALE"
     LOST = "LOST"
 
 
@@ -18,7 +20,7 @@ class ProjectBase(BaseModel):
     customer_id: UUID
     name: str = Field(..., description="项目名称")
     description: Optional[str] = Field(None, description="项目描述")
-    budget: Optional[int] = Field(None, description="预算（元）")
+    amount: Optional[int] = Field(None, description="金额（元）")
     status: ProjectStatus = Field(ProjectStatus.LEAD, description="项目状态")
 
 
@@ -29,7 +31,7 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, description="项目名称")
     description: Optional[str] = Field(None, description="项目描述")
-    budget: Optional[int] = Field(None, description="预算（元）")
+    amount: Optional[int] = Field(None, description="金额（元）")
     status: Optional[ProjectStatus] = Field(None, description="项目状态")
 
 

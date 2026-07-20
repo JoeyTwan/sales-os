@@ -19,6 +19,12 @@ from .project import (
     ProjectUpdate,
     ProjectOut,
 )
+from .project_contact import (
+    ProjectContactBase,
+    ProjectContactCreate,
+    ProjectContactUpdate,
+    ProjectContactOut,
+)
 
 __all__ = [
     "CustomerLevel",
@@ -36,4 +42,8 @@ __all__ = [
     "ProjectCreate",
     "ProjectUpdate",
     "ProjectOut",
+    "ProjectContactBase",
+    "ProjectContactCreate",
+    "ProjectContactUpdate",
+    "ProjectContactOut",
 ]

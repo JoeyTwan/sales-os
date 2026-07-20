@@ -23,8 +23,8 @@ class TaskBase(BaseModel):
     status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
     due_date: Optional[date] = None
+    project_id: str
     customer_id: Optional[str] = None
-    project_id: Optional[str] = None
 
 
 class TaskCreate(TaskBase):
@@ -37,12 +37,19 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
     priority: Optional[TaskPriority] = None
     due_date: Optional[date] = None
-    customer_id: Optional[str] = None
     project_id: Optional[str] = None
+    customer_id: Optional[str] = None
 
 
-class TaskOut(TaskBase):
+class TaskOut(BaseModel):
     id: UUID
+    title: str
+    description: Optional[str] = None
+    status: TaskStatus = TaskStatus.TODO
+    priority: TaskPriority = TaskPriority.MEDIUM
+    due_date: Optional[date] = None
+    project_id: Optional[str] = None
+    customer_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     customer_name: Optional[str] = None

@@ -12,8 +12,8 @@ class CustomerLevel(str, Enum):
 
 
 class CustomerStatus(str, Enum):
-    ACTIVE = "ACTIVE"
-    FOLLOWING = "FOLLOWING"
+    PROSPECT = "PROSPECT"
+    CUSTOMER = "CUSTOMER"
     PAUSED = "PAUSED"
     LOST = "LOST"
 

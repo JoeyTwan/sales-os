@@ -14,8 +14,8 @@ class Task(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), nullable=True)
-    customer_id = Column(String(36), ForeignKey("customers.id", ondelete="CASCADE"), nullable=True)
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    customer_id = Column(String(36), ForeignKey("customers.id", ondelete="CASCADE"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(TaskStatus, nullable=False, default="TODO")

@@ -6,7 +6,7 @@ from sqlalchemy.sql import func
 from ..database import Base
 
 CustomerLevel = Enum("HIGH", "MEDIUM", "LOW", name="customer_level")
-CustomerStatus = Enum("ACTIVE", "FOLLOWING", "PAUSED", "LOST", name="customer_status")
+CustomerStatus = Enum("PROSPECT", "CUSTOMER", "PAUSED", "LOST", name="customer_status")
 
 
 class Customer(Base):
