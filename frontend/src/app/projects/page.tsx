@@ -226,9 +226,10 @@ export default function ProjectsPage() {
       ) : (
         <div className="space-y-4">
           {filteredProjects.map((project) => (
-            <div
+            <Link
               key={project.id}
-              className="bg-card rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow"
+              href={`/projects/${project.id}`}
+              className="block bg-card rounded-xl shadow-sm p-6 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -265,7 +266,7 @@ export default function ProjectsPage() {
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
