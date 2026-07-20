@@ -1,3 +1,65 @@
+export interface CustomerOverviewContact {
+  id: string;
+  name: string;
+  position: string | null;
+  phone: string | null;
+  email: string | null;
+  remark: string | null;
+}
+
+export interface CustomerOverviewProject {
+  id: string;
+  name: string;
+  description: string | null;
+  amount: number | null;
+  status: string;
+  updated_at: string;
+}
+
+export interface CustomerOverviewActivity {
+  id: string;
+  content: string;
+  source: string;
+  activity_date: string;
+}
+
+export interface CustomerOverviewTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_date: string | null;
+}
+
+export interface CustomerOverviewStatistics {
+  project_count: number;
+  contact_count: number;
+  task_count: number;
+  activity_count: number;
+  project_stage_count: Record<string, number>;
+}
+
+export interface CustomerOverviewCustomer {
+  id: string;
+  name: string;
+  level: string;
+  status: string;
+  summary: string;
+  next_action: string;
+  next_action_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerOverview {
+  customer: CustomerOverviewCustomer;
+  contacts: CustomerOverviewContact[];
+  projects: CustomerOverviewProject[];
+  tasks: CustomerOverviewTask[];
+  activities: CustomerOverviewActivity[];
+  statistics: CustomerOverviewStatistics;
+}
+
 export async function apiRequest<T>(
   url: string,
   options: RequestInit = {}

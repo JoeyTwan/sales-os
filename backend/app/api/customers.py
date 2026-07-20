@@ -113,9 +113,9 @@ def update_customer(customer_id: str, customer_update: CustomerUpdate, db: Sessi
 
 
 @router.get("/{customer_id}/overview", response_model=CustomerOverview)
-def get_customer_overview(customer_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_customer_overview(customer_id: str, db: Session = Depends(get_db)):
     customer_result = db.execute(
-        text("SELECT id, name, level, status, summary FROM customers WHERE id = :customer_id"),
+        text("SELECT id, name, level, status, summary, next_action, next_action_date, created_at, updated_at FROM customers WHERE id = :customer_id"),
         {"customer_id": customer_id}
     ).first()
     
@@ -128,6 +128,10 @@ def get_customer_overview(customer_id: str, db: Session = Depends(get_db), curre
         "level": customer_result.level,
         "status": customer_result.status,
         "summary": customer_result.summary,
+        "next_action": customer_result.next_action,
+        "next_action_date": customer_result.next_action_date,
+        "created_at": customer_result.created_at,
+        "updated_at": customer_result.updated_at,
     }
     
     contacts_result = db.execute(
@@ -145,7 +149,7 @@ def get_customer_overview(customer_id: str, db: Session = Depends(get_db), curre
     } for c in contacts_result]
     
     projects_result = db.execute(
-        text("SELECT id, name, description, budget, status FROM projects WHERE customer_id = :customer_id"),
+        text("SELECT id, name, description, amount, status, updated_at FROM projects WHERE customer_id = :customer_id ORDER BY updated_at DESC"),
         {"customer_id": customer_id}
     ).all()
     
@@ -153,9 +157,23 @@ def get_customer_overview(customer_id: str, db: Session = Depends(get_db), curre
         "id": p.id,
         "name": p.name,
         "description": p.description,
-        "budget": p.budget,
+        "amount": p.amount,
         "status": p.status,
+        "updated_at": p.updated_at,
     } for p in projects_result]
+    
+    tasks_result = db.execute(
+        text("SELECT id, title, status, priority, due_date FROM tasks WHERE customer_id = :customer_id OR project_id IN (SELECT id FROM projects WHERE customer_id = :customer_id) ORDER BY due_date"),
+        {"customer_id": customer_id}
+    ).all()
+    
+    tasks_list = [{
+        "id": t.id,
+        "title": t.title,
+        "status": t.status,
+        "priority": t.priority,
+        "due_date": t.due_date,
+    } for t in tasks_result]
     
     activities_result = db.execute(
         text("SELECT id, content, source, activity_date FROM activities WHERE customer_id = :customer_id ORDER BY activity_date DESC"),
@@ -169,16 +187,26 @@ def get_customer_overview(customer_id: str, db: Session = Depends(get_db), curre
         "activity_date": a.activity_date,
     } for a in activities_result]
     
+    stage_counts = {}
+    for p in projects_list:
+        stage = p["status"]
+        if stage not in stage_counts:
+            stage_counts[stage] = 0
+        stage_counts[stage] += 1
+    
     statistics = {
         "project_count": len(projects_list),
         "contact_count": len(contacts_list),
+        "task_count": len(tasks_list),
         "activity_count": len(activities_list),
+        "project_stage_count": stage_counts,
     }
     
     return {
         "customer": customer_dict,
         "contacts": contacts_list,
         "projects": projects_list,
+        "tasks": tasks_list,
         "activities": activities_list,
         "statistics": statistics,
     }

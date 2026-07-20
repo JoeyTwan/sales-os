@@ -1,5 +1,5 @@
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -17,8 +17,9 @@ class CustomerOverviewProject(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
-    budget: Optional[int] = None
+    amount: Optional[int] = None
     status: str
+    updated_at: Optional[datetime] = None
 
 
 class CustomerOverviewActivity(BaseModel):
@@ -28,16 +29,27 @@ class CustomerOverviewActivity(BaseModel):
     activity_date: date
 
 
+class CustomerOverviewTask(BaseModel):
+    id: str
+    title: str
+    status: str
+    priority: str
+    due_date: Optional[date] = None
+
+
 class CustomerOverviewStatistics(BaseModel):
     project_count: int
     contact_count: int
+    task_count: int
     activity_count: int
+    project_stage_count: dict
 
 
 class CustomerOverview(BaseModel):
     customer: dict
     contacts: List[CustomerOverviewContact]
     projects: List[CustomerOverviewProject]
+    tasks: List[CustomerOverviewTask]
     activities: List[CustomerOverviewActivity]
     statistics: CustomerOverviewStatistics
 

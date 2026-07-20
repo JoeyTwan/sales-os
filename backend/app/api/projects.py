@@ -27,7 +27,7 @@ def create_project(request: ProjectCreate, db: Session = Depends(get_db), curren
         customer_id=str(request.customer_id),
         name=request.name,
         description=request.description,
-        budget=request.budget,
+        amount=request.amount,
         status=request.status.value,
     )
     db.add(project)
@@ -72,7 +72,7 @@ def update_project(project_id: str, request: ProjectCreate, db: Session = Depend
 
     project.name = request.name
     project.description = request.description
-    project.budget = request.budget
+    project.amount = request.amount
     project.status = request.status.value
     db.commit()
     db.refresh(project)

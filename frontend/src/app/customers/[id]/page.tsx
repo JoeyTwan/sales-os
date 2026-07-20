@@ -1,400 +1,269 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { ArrowLeft, User, Folder, FileText, Calendar, Clock, Target, DollarSign, Users, Zap, TrendingUp, AlertTriangle, RefreshCw, Brain, Plus, X } from "lucide-react";
-import { apiGet, apiPost } from "@/lib/api";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, User, Folder, FileText, Calendar, Clock, Target, DollarSign, Users, Zap, TrendingUp, AlertTriangle, RefreshCw, Brain, Plus, X, Building2 } from "lucide-react";
+import { apiGet, apiPost, CustomerOverview, CustomerOverviewContact, CustomerOverviewProject, CustomerOverviewActivity, CustomerOverviewTask } from "@/lib/api";
 
-interface Customer {
-  id: string;
-  name: string;
-  level: "HIGH" | "MEDIUM" | "LOW";
-  status: "ACTIVE" | "FOLLOWING" | "PAUSED" | "LOST";
-  summary: string;
-  next_action: string;
-  next_action_date: string;
-  created_at: string;
-  updated_at: string;
-  ai_summary?: CustomerAISummary;
-}
+const STATUS_FLOW = [
+  { key: "LEAD", label: "线索" },
+  { key: "NEEDS_CONFIRMATION", label: "需求确认" },
+  { key: "SOLUTION_DESIGN", label: "方案" },
+  { key: "TECH_VALIDATION", label: "技术验证" },
+  { key: "BUSINESS_NEGOTIATION", label: "商务" },
+  { key: "WON", label: "成交" },
+  { key: "AFTER_SALE", label: "售后" },
+];
 
-interface CustomerAISummary {
-  stage: string;
-  budget: string;
-  decision_maker: string;
-  risk: string;
-  next_action: string;
-  estimated_close_date: string;
-  confidence: number;
-  last_activity_summary: string;
-  total_tasks: number;
-  completed_tasks: number;
-  overdue_tasks: number;
-  task_completion_rate: number;
-}
+const getLevelClass = (level: string) => {
+  switch (level) {
+    case "HIGH":
+      return "bg-red-500/10 text-red-600";
+    case "MEDIUM":
+      return "bg-yellow-500/10 text-yellow-700";
+    case "LOW":
+      return "bg-muted/50 text-muted-foreground";
+    default:
+      return "bg-muted/50 text-muted-foreground";
+  }
+};
 
-interface Project {
-  id: string;
-  customer_id: string;
-  name: string;
-  description: string;
-  budget: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
+const getLevelLabel = (level: string) => {
+  switch (level) {
+    case "HIGH":
+      return "高";
+    case "MEDIUM":
+      return "中";
+    case "LOW":
+      return "低";
+    default:
+      return level;
+  }
+};
 
-interface Activity {
-  id: string;
-  customer_id: string;
-  project_id: string | null;
-  content: string;
-  source: string;
-  activity_date: string;
-  created_at: string;
-}
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case "ACTIVE":
+      return "跟进中";
+    case "FOLLOWING":
+      return "重点推进";
+    case "PAUSED":
+      return "已暂停";
+    case "LOST":
+      return "已丢失";
+    default:
+      return status;
+  }
+};
 
-interface TimelineItem {
-  id: string;
-  type: string;
-  title: string;
-  content: string;
-  timestamp: string;
-  status?: string;
-  priority?: string;
-}
+const getStatusClass = (status: string) => {
+  switch (status) {
+    case "ACTIVE":
+      return "bg-green-500/10 text-green-600";
+    case "FOLLOWING":
+      return "bg-amber-500/10 text-amber-600";
+    case "PAUSED":
+      return "bg-yellow-500/10 text-yellow-700";
+    case "LOST":
+      return "bg-gray-500/10 text-gray-600";
+    default:
+      return "bg-muted/50 text-muted-foreground";
+  }
+};
 
-interface Task {
-  id: string;
-  customer_id: string | null;
-  project_id: string | null;
-  title: string;
-  description: string | null;
-  status: "TODO" | "DOING" | "DONE";
-  priority: "HIGH" | "MEDIUM" | "LOW";
-  due_date: string | null;
-  created_at: string;
-  updated_at: string;
-}
+const getProjectStatusLabel = (status: string) => {
+  const found = STATUS_FLOW.find((s) => s.key === status);
+  if (found) return found.label;
+  switch (status) {
+    case "QUALIFIED":
+      return "需求确认";
+    case "PROPOSAL":
+      return "方案设计";
+    case "VERIFICATION":
+      return "技术验证";
+    case "NEGOTIATION":
+      return "商务谈判";
+    case "AFTER_SALE":
+      return "售后维护";
+    case "LOST":
+      return "已流失";
+    default:
+      return status;
+  }
+};
+
+const getProjectStatusClass = (status: string) => {
+  switch (status) {
+    case "LEAD":
+    case "QUALIFIED":
+      return "bg-blue-500/10 text-blue-600";
+    case "NEEDS_CONFIRMATION":
+      return "bg-green-500/10 text-green-600";
+    case "SOLUTION_DESIGN":
+    case "PROPOSAL":
+      return "bg-purple-500/10 text-purple-600";
+    case "TECH_VALIDATION":
+    case "VERIFICATION":
+      return "bg-cyan-500/10 text-cyan-600";
+    case "BUSINESS_NEGOTIATION":
+    case "NEGOTIATION":
+      return "bg-orange-500/10 text-orange-600";
+    case "WON":
+      return "bg-emerald-500/10 text-emerald-600";
+    case "AFTER_SALE":
+      return "bg-indigo-500/10 text-indigo-600";
+    case "LOST":
+      return "bg-gray-500/10 text-gray-600";
+    default:
+      return "bg-muted/50 text-muted-foreground";
+  }
+};
+
+const getSourceLabel = (source: string) => {
+  switch (source) {
+    case "capture":
+      return "📥 Capture";
+    case "manual":
+      return "✏️ 手动";
+    case "email":
+      return "📧 邮件";
+    case "phone":
+      return "📞 电话";
+    case "meeting":
+      return "📝 会议纪要";
+    default:
+      return source;
+  }
+};
+
+const getTaskStatusLabel = (status: string) => {
+  switch (status) {
+    case "TODO":
+      return "待办";
+    case "DOING":
+      return "进行中";
+    case "DONE":
+      return "已完成";
+    default:
+      return status;
+  }
+};
+
+const getTaskStatusClass = (status: string) => {
+  switch (status) {
+    case "TODO":
+      return "bg-muted/50 text-muted-foreground";
+    case "DOING":
+      return "bg-blue-500/10 text-blue-600";
+    case "DONE":
+      return "bg-green-500/10 text-green-600";
+    default:
+      return "bg-muted/50 text-muted-foreground";
+  }
+};
+
+const getTaskPriorityClass = (priority: string) => {
+  switch (priority) {
+    case "HIGH":
+      return "bg-red-500/10 text-red-600";
+    case "MEDIUM":
+      return "bg-yellow-500/10 text-yellow-700";
+    case "LOW":
+      return "bg-muted/50 text-muted-foreground";
+    default:
+      return "bg-muted/50 text-muted-foreground";
+  }
+};
+
+const getTaskPriorityLabel = (priority: string) => {
+  switch (priority) {
+    case "HIGH":
+      return "高";
+    case "MEDIUM":
+      return "中";
+    case "LOW":
+      return "低";
+    default:
+      return priority;
+  }
+};
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("zh-CN", { year: "numeric", month: "short", day: "numeric" });
+};
+
+const formatDateTime = (dateStr: string) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+const formatAmount = (amount: number | null | undefined) => {
+  if (!amount) return "-";
+  if (amount >= 10000) {
+    return `${(amount / 10000).toFixed(1)}万`;
+  }
+  return amount.toLocaleString();
+};
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const router = useRouter();
+  const [overview, setOverview] = useState<CustomerOverview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [brainInput, setBrainInput] = useState("");
-  const [brainMessages, setBrainMessages] = useState<{ role: "user" | "ai"; content: string }[]>([]);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
   const [projectError, setProjectError] = useState("");
   const [newProject, setNewProject] = useState({
     name: "",
     customer_id: id as string,
-    status: "LEAD" as Project["status"],
-    budget: "",
+    status: "LEAD" as string,
+    amount: "",
     description: "",
   });
 
   useEffect(() => {
-    loadCustomer();
-    loadProjects();
-    loadActivities();
-    loadTasks();
-    loadTimeline();
+    loadOverview();
   }, [id]);
 
-  const loadCustomer = async () => {
+  const loadOverview = async () => {
     try {
-      const data = await apiGet<Customer>(`/api/customers/${id}`);
-      setCustomer(data);
-    } catch {}
-  };
-
-  const loadProjects = async () => {
-    try {
-      const data = await apiGet<Project[]>(`/api/projects/customer/${id}`);
-      const projectsWithTaskCount = await Promise.all(
-        data.map(async (project: Project) => {
-          try {
-            const tasksData = await apiGet<Task[]>(`/api/tasks/project/${project.id}`);
-            return { ...project, task_count: tasksData.length };
-          } catch {}
-          return { ...project, task_count: 0 };
-        })
-      );
-      setProjects(projectsWithTaskCount);
-    } catch {}
-  };
-
-  const loadActivities = async () => {
-    try {
-      const data = await apiGet<Activity[]>(`/api/activities/customer/${id}`);
-      data.sort((a: Activity, b: Activity) => 
-        new Date(b.activity_date).getTime() - new Date(a.activity_date).getTime()
-      );
-      setActivities(data);
-    } catch {} finally {
+      const data = await apiGet<CustomerOverview>(`/api/customers/${id}/overview`);
+      setOverview(data);
+    } catch (err) {
+      console.error("Load overview error:", err);
+    } finally {
       setLoading(false);
     }
   };
 
-  const loadTasks = async () => {
+  const handleCreateProject = async () => {
+    if (!newProject.name.trim()) return;
+    setCreatingProject(true);
+    setProjectError("");
     try {
-      const data = await apiGet<Task[]>(`/api/tasks/customer/${id}`);
-      setTasks(data);
-    } catch {}
-  };
-
-  const loadTimeline = async () => {
-    try {
-      const data = await apiGet<TimelineItem[]>(`/api/activities/customer/${id}/timeline`);
-      setTimeline(data);
-    } catch {}
-  };
-
-  const refreshAISummary = async () => {
-    setRefreshing(true);
-    try {
-      await apiPost(`/api/customers/${id}/ai-summary/refresh`, {});
-      await loadCustomer();
-    } catch {} finally {
-      setRefreshing(false);
+      await apiPost("/api/projects", {
+        ...newProject,
+        amount: newProject.amount ? parseInt(newProject.amount) : null,
+      });
+      setShowProjectModal(false);
+      setNewProject({
+        name: "",
+        customer_id: id as string,
+        status: "LEAD",
+        amount: "",
+        description: "",
+      });
+      loadOverview();
+    } catch (err) {
+      setProjectError("创建项目失败，请稍后重试");
+      console.error("Create project error:", err);
+    } finally {
+      setCreatingProject(false);
     }
-  };
-
-  const getLevelClass = (level: string) => {
-    switch (level) {
-      case "HIGH":
-        return "bg-red-500/10 text-red-600";
-      case "MEDIUM":
-        return "bg-yellow-500/10 text-yellow-700";
-      case "LOW":
-        return "bg-muted/50 text-muted-foreground";
-    }
-  };
-
-  const getLevelLabel = (level: string) => {
-    switch (level) {
-      case "HIGH":
-        return "高";
-      case "MEDIUM":
-        return "中";
-      case "LOW":
-        return "低";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "跟进中";
-      case "FOLLOWING":
-        return "重点推进";
-      case "PAUSED":
-        return "已暂停";
-      case "LOST":
-        return "已丢失";
-    }
-  };
-
-  const getProjectStatusLabel = (status: string) => {
-    switch (status) {
-      case "LEAD":
-        return "线索阶段";
-      case "QUALIFIED":
-        return "需求确认";
-      case "PROPOSAL":
-        return "方案设计";
-      case "VERIFICATION":
-        return "技术验证";
-      case "NEGOTIATION":
-        return "商务谈判";
-      case "WON":
-        return "已成交";
-      case "LOST":
-        return "售后维护";
-      default:
-        return status;
-    }
-  };
-
-  const getProjectStatusClass = (status: string) => {
-    switch (status) {
-      case "LEAD":
-        return "bg-blue-500/10 text-blue-600";
-      case "QUALIFIED":
-        return "bg-green-500/10 text-green-600";
-      case "PROPOSAL":
-        return "bg-purple-500/10 text-purple-600";
-      case "VERIFICATION":
-        return "bg-cyan-500/10 text-cyan-600";
-      case "NEGOTIATION":
-        return "bg-orange-500/10 text-orange-600";
-      case "WON":
-        return "bg-emerald-500/10 text-emerald-600";
-      case "LOST":
-        return "bg-gray-500/10 text-gray-600";
-      default:
-        return "bg-muted/50 text-muted-foreground";
-    }
-  };
-
-  const getSourceLabel = (source: string) => {
-    switch (source) {
-      case "capture":
-        return "📥 Capture";
-      case "manual":
-        return "✏️ 手动";
-      case "email":
-        return "📧 邮件";
-      case "phone":
-        return "📞 电话";
-      case "meeting":
-        return "📝 会议纪要";
-    }
-  };
-
-  const getSourceClass = (source: string) => {
-    switch (source) {
-      case "capture":
-        return "bg-primary/10 text-primary";
-      case "manual":
-        return "bg-muted/50 text-muted-foreground";
-      case "email":
-        return "bg-blue-500/10 text-blue-600";
-      case "phone":
-        return "bg-green-500/10 text-green-600";
-      case "meeting":
-        return "bg-purple-500/10 text-purple-600";
-    }
-  };
-
-  const getStageClass = (stage: string) => {
-    if (!stage) return "bg-muted/50 text-muted-foreground";
-    if (stage.includes("线索")) return "bg-blue-500/10 text-blue-600";
-    if (stage.includes("确认")) return "bg-green-500/10 text-green-600";
-    if (stage.includes("方案")) return "bg-purple-500/10 text-purple-600";
-    if (stage.includes("谈判")) return "bg-orange-500/10 text-orange-600";
-    if (stage.includes("成交")) return "bg-emerald-500/10 text-emerald-600";
-    if (stage.includes("流失")) return "bg-red-500/10 text-red-600";
-    return "bg-muted/50 text-muted-foreground";
-  };
-
-  const getTaskStatusLabel = (status: string) => {
-    switch (status) {
-      case "TODO":
-        return "待办";
-      case "DOING":
-        return "进行中";
-      case "DONE":
-        return "已完成";
-    }
-  };
-
-  const getTaskStatusClass = (status: string) => {
-    switch (status) {
-      case "TODO":
-        return "bg-muted/50 text-muted-foreground";
-      case "DOING":
-        return "bg-blue-500/10 text-blue-600";
-      case "DONE":
-        return "bg-green-500/10 text-green-600";
-    }
-  };
-
-  const getTaskPriorityClass = (priority: string) => {
-    switch (priority) {
-      case "HIGH":
-        return "bg-red-500/10 text-red-600";
-      case "MEDIUM":
-        return "bg-yellow-500/10 text-yellow-700";
-      case "LOW":
-        return "bg-muted/50 text-muted-foreground";
-    }
-  };
-
-  const getTaskPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case "HIGH":
-        return "高";
-      case "MEDIUM":
-        return "中";
-      case "LOW":
-        return "低";
-    }
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return "text-emerald-600";
-    if (confidence >= 50) return "text-amber-600";
-    return "text-red-600";
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return "今天";
-    }
-    if (date.toDateString() === yesterday.toDateString()) {
-      return "昨天";
-    }
-    return date.toLocaleDateString("zh-CN", { year: "numeric", month: "short", day: "numeric" });
-  };
-
-  const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  };
-
-  const formatBudget = (budget: number | undefined) => {
-    if (!budget) return "";
-    if (budget >= 10000) {
-      return `${(budget / 10000).toFixed(0)}万`;
-    }
-    return `${budget}元`;
-  };
-
-  const truncateContent = (text: string, maxLength: number = 100) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
-  };
-
-  const formatTimeAgo = (dateStr: string) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "刚刚";
-    if (diffMins < 60) return `${diffMins}分钟前`;
-    if (diffHours < 24) return `${diffHours}小时前`;
-    if (diffDays < 7) return `${diffDays}天前`;
-    return formatDate(dateStr);
-  };
-
-  const groupActivitiesByDate = () => {
-    const groups: Record<string, Activity[]> = {};
-    activities.forEach((activity) => {
-      const date = formatDate(activity.activity_date);
-      if (!groups[date]) {
-        groups[date] = [];
-      }
-      groups[date].push(activity);
-    });
-    return groups;
   };
 
   if (loading) {
@@ -408,7 +277,7 @@ export default function CustomerDetailPage() {
     );
   }
 
-  if (!customer) {
+  if (!overview) {
     return (
       <div className="py-8">
         <p className="text-muted-foreground">客户不存在</p>
@@ -416,114 +285,77 @@ export default function CustomerDetailPage() {
     );
   }
 
-  const activityGroups = groupActivitiesByDate();
-  const aiSummary = customer.ai_summary;
-
-  const handleCreateProject = async () => {
-    if (!newProject.name.trim()) return;
-    setCreatingProject(true);
-    setProjectError("");
-    try {
-      await apiPost("/api/projects", {
-        ...newProject,
-        budget: newProject.budget ? parseInt(newProject.budget) : null,
-      });
-      setShowProjectModal(false);
-      setNewProject({
-        name: "",
-        customer_id: id as string,
-        status: "LEAD",
-        budget: "",
-        description: "",
-      });
-      loadProjects();
-    } catch (err) {
-      setProjectError("创建项目失败，请稍后重试");
-      console.error("Create project error:", err);
-    } finally {
-      setCreatingProject(false);
-    }
-  };
+  const { customer, contacts, projects, tasks, activities, statistics } = overview;
 
   return (
     <div className="py-8">
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={() => window.history.back()}
+          onClick={() => router.push("/customers")}
           className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>返回</span>
+          <span>返回客户列表</span>
         </button>
         <h1 className="text-2xl font-semibold">{customer.name}</h1>
         <span className={`ml-auto px-3 py-1 text-xs font-medium rounded-full ${getLevelClass(customer.level)}`}>
-          {getLevelLabel(customer.level)}
+          {getLevelLabel(customer.level)}级客户
         </span>
       </div>
 
       <div className="bg-card rounded-xl shadow-sm p-6 mb-8 border border-primary/5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">客户战略大脑</span>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusClass(customer.status)}`}>
+              {getStatusLabel(customer.status)}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              <Clock className="w-4 h-4 inline mr-1" />
+              更新于 {formatDateTime(customer.updated_at)}
+            </span>
           </div>
           <button
-            onClick={refreshAISummary}
-            disabled={refreshing}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors disabled:opacity-50"
+            onClick={() => {
+              setNewProject({
+                name: "",
+                customer_id: id as string,
+                status: "LEAD",
+                amount: "",
+                description: "",
+              });
+              setShowProjectModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
           >
-            <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
-            <span>刷新</span>
+            <Plus className="w-4 h-4" />
+            <span>新建项目</span>
           </button>
         </div>
-        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-          {aiSummary?.last_activity_summary || "暂无分析数据"}
-        </p>
       </div>
 
       <div className="bg-card rounded-xl shadow-sm p-6 mb-8">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-4">
-          <Zap className="w-4 h-4" />
-          <span>客户大脑对话</span>
+          <TrendingUp className="w-4 h-4" />
+          <span>项目漏斗</span>
         </div>
-        
-        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
-          {brainMessages.map((msg, index) => (
-            <div key={index} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-primary/10' : 'bg-muted/30'}`}>
-              <p className="text-xs text-muted-foreground mb-1">{msg.role === 'user' ? '用户' : 'AI'}</p>
-              <p className="text-sm">{msg.content}</p>
-            </div>
-          ))}
-          {brainMessages.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">开始与客户大脑对话...</p>
-          )}
-        </div>
-        
-        <div className="mt-4 pt-4 border-t border-border flex gap-2">
-          <input
-            type="text"
-            value={brainInput}
-            onChange={(e) => setBrainInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setBrainMessages([...brainMessages, { role: 'user', content: brainInput }, { role: 'ai', content: '正在分析中...' }]);
-                setBrainInput('');
-              }
-            }}
-            className="flex-1 bg-zinc-800 dark:bg-zinc-800 light:bg-gray-100 border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            placeholder="输入问题..."
-          />
-          <button
-            onClick={() => {
-              if (brainInput.trim()) {
-                setBrainMessages([...brainMessages, { role: 'user', content: brainInput }, { role: 'ai', content: '正在分析中...' }]);
-                setBrainInput('');
-              }
-            }}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
-          >
-            发送
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="text-center">
+            <p className="text-2xl font-semibold text-primary">{statistics.project_count}</p>
+            <p className="text-xs text-muted-foreground mt-1">全部项目</p>
+          </div>
+          <div className="flex-1 mx-8 flex items-center justify-between">
+            {STATUS_FLOW.map((stage) => {
+              const count = statistics.project_stage_count[stage.key] || 0;
+              return (
+                <div key={stage.key} className="text-center">
+                  <p className={`text-lg font-medium ${count > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                    {count}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{stage.label}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -537,7 +369,9 @@ export default function CustomerDetailPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">状态</p>
-                <p className="text-sm font-medium">{getStatusLabel(customer.status)}</p>
+                <span className={`px-3 py-1 rounded-lg text-sm font-medium ${getStatusClass(customer.status)}`}>
+                  {getStatusLabel(customer.status)}
+                </span>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">摘要</p>
@@ -555,18 +389,55 @@ export default function CustomerDetailPage() {
                 <p className="text-xs text-muted-foreground mb-1">创建时间</p>
                 <p className="text-sm text-foreground/80">{formatDateTime(customer.created_at)}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">最近更新</p>
-                <p className="text-sm text-foreground/80">{formatDateTime(customer.updated_at)}</p>
-              </div>
             </div>
           </div>
 
           <div className="bg-card rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-4">
+              <Users className="w-4 h-4" />
+              <span>联系人 ({contacts.length})</span>
+            </div>
+            {contacts.length > 0 ? (
+              <div className="space-y-3">
+                {contacts.map((contact) => (
+                  <div key={contact.id} className="p-3 rounded-xl bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{contact.name}</p>
+                        <p className="text-xs text-muted-foreground">{contact.position || "-"}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">暂无联系人</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-card rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-4">
+              <Brain className="w-4 h-4" />
+              <span>客户战略大脑</span>
+            </div>
+            <div className="p-4 bg-muted/30 rounded-lg">
+              <p className="text-sm text-foreground/80">当前：暂无</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Folder className="w-4 h-4" />
-                <span>项目列表</span>
+                <span>项目列表 ({projects.length})</span>
               </div>
               <button
                 onClick={() => {
@@ -574,7 +445,7 @@ export default function CustomerDetailPage() {
                     name: "",
                     customer_id: id as string,
                     status: "LEAD",
-                    budget: "",
+                    amount: "",
                     description: "",
                   });
                   setShowProjectModal(true);
@@ -588,28 +459,31 @@ export default function CustomerDetailPage() {
             {projects.length > 0 ? (
               <div className="space-y-3">
                 {projects.map((project) => (
-                  <div key={project.id} className="p-4 rounded-xl bg-muted/30">
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className="block p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium">{project.name}</p>
+                      <div className="flex items-center gap-3">
+                        <Building2 className="w-5 h-5 text-primary" />
+                        <p className="text-sm font-medium">{project.name}</p>
+                      </div>
                       <span className={`px-2.5 py-1 text-xs font-medium rounded-lg ${getProjectStatusClass(project.status)}`}>
                         {getProjectStatusLabel(project.status)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 text-xs">
-                      <div>
-                        <p className="text-muted-foreground mb-1">预计金额</p>
-                        <p className="font-medium text-amber-600">{formatBudget(project.budget) || "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground mb-1">更新时间</p>
-                        <p className="font-medium">{formatDate(project.updated_at)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground mb-1">任务数</p>
-                        <p className="font-medium">{(project as any).task_count || 0}</p>
-                      </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-amber-600 font-medium">
+                        <DollarSign className="w-3 h-3 inline mr-1" />
+                        {formatAmount(project.amount)}
+                      </span>
+                      <span className="text-muted-foreground">
+                        <Clock className="w-3 h-3 inline mr-1" />
+                        {formatDate(project.updated_at)}
+                      </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
@@ -622,7 +496,7 @@ export default function CustomerDetailPage() {
                       name: "",
                       customer_id: id as string,
                       status: "LEAD",
-                      budget: "",
+                      amount: "",
                       description: "",
                     });
                     setShowProjectModal(true);
@@ -634,13 +508,11 @@ export default function CustomerDetailPage() {
               </div>
             )}
           </div>
-        </div>
 
-        <div className="lg:col-span-2 space-y-6">
           <div className="bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-6">
               <Target className="w-4 h-4" />
-              <span>任务列表</span>
+              <span>任务列表 ({tasks.length})</span>
             </div>
             {tasks.length > 0 ? (
               <div className="space-y-3">
@@ -677,56 +549,33 @@ export default function CustomerDetailPage() {
           <div className="bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-6">
               <Clock className="w-4 h-4" />
-              <span>时间线</span>
+              <span>时间线 ({activities.length})</span>
             </div>
 
-            {timeline.length > 0 ? (
+            {activities.length > 0 ? (
               <div className="relative">
                 <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-border"></div>
                 <div className="space-y-6">
-                  {timeline.map((item) => {
-                    const iconColor = item.type === 'activity' ? 'bg-primary/10 text-primary' : 
-                                     item.type === 'task' ? 'bg-blue-500/10 text-blue-600' : 
-                                     'bg-purple-500/10 text-purple-600';
-                    const IconComponent = item.type === 'activity' ? FileText : 
-                                         item.type === 'task' ? Target : Folder;
-                    
-                    return (
-                      <div key={item.id} className="relative">
-                        <div className={`absolute left-0 w-10 h-10 rounded-full ${iconColor} flex items-center justify-center z-10`}>
-                          <IconComponent className="w-4 h-4" />
-                        </div>
-                        <div className="ml-14 bg-muted/30 rounded-xl p-5">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${iconColor}`}>
-                              {item.title}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDateTime(item.timestamp)}
-                            </span>
-                          </div>
-                          <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                            {item.content}
-                          </p>
-                          {item.status && item.type === 'project' && (
-                            <div className="flex items-center gap-2 mt-3">
-                              <span className="text-xs text-muted-foreground">状态:</span>
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getProjectStatusClass(item.status)}`}>
-                                {getProjectStatusLabel(item.status)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                  {activities.map((activity) => (
+                    <div key={activity.id} className="relative">
+                      <div className="absolute left-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center z-10">
+                        <FileText className="w-4 h-4" />
                       </div>
-                    );
-                  })}
+                      <div className="ml-14 bg-muted/30 rounded-xl p-5">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-xs text-muted-foreground">{getSourceLabel(activity.source)}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(activity.activity_date)}</span>
+                        </div>
+                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{activity.content}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : (
               <div className="text-center py-12">
                 <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">暂无活动记录</p>
-                <p className="text-sm text-muted-foreground mt-2">通过 Capture 录入内容后，会自动记录到这里</p>
               </div>
             )}
           </div>
@@ -780,24 +629,25 @@ export default function CustomerDetailPage() {
                 <label className="block text-sm text-muted-foreground mb-2 font-medium">项目阶段 <span className="text-red-500">*</span></label>
                 <select
                   value={newProject.status}
-                  onChange={(e) => setNewProject({ ...newProject, status: e.target.value as Project["status"] })}
+                  onChange={(e) => setNewProject({ ...newProject, status: e.target.value })}
                   className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 >
                   <option value="LEAD">线索阶段</option>
-                  <option value="QUALIFIED">需求确认</option>
-                  <option value="PROPOSAL">方案设计</option>
-                  <option value="VERIFICATION">技术验证</option>
-                  <option value="NEGOTIATION">商务谈判</option>
+                  <option value="NEEDS_CONFIRMATION">需求确认</option>
+                  <option value="SOLUTION_DESIGN">方案设计</option>
+                  <option value="TECH_VALIDATION">技术验证</option>
+                  <option value="BUSINESS_NEGOTIATION">商务谈判</option>
                   <option value="WON">已成交</option>
-                  <option value="LOST">售后维护</option>
+                  <option value="AFTER_SALE">售后维护</option>
+                  <option value="LOST">已流失</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm text-muted-foreground mb-2 font-medium">预计金额</label>
                 <input
                   type="number"
-                  value={newProject.budget}
-                  onChange={(e) => setNewProject({ ...newProject, budget: e.target.value })}
+                  value={newProject.amount}
+                  onChange={(e) => setNewProject({ ...newProject, amount: e.target.value })}
                   className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   placeholder="0"
                 />
