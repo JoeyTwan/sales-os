@@ -10,9 +10,11 @@ from ..models.project_contact import ProjectContact
 from ..models.contact import Contact
 from ..models.task import Task
 from ..models.activity import Activity
+from ..models.project_stage_history import ProjectStageHistory
 from ..schemas.project import ProjectCreate, ProjectOut, ProjectStatus
 from ..schemas.overview import ProjectOverview
 from ..schemas.project_contact import ProjectContactCreate, ProjectContactOut
+from ..schemas.project_stage_history import ProjectStatusUpdate, ProjectStatusUpdateOut, ProjectNextActionUpdate, ProjectStageHistoryOut
 from ..utils.auth import get_current_user
 from ..models.user import User
 
@@ -89,9 +91,9 @@ def delete_project(project_id: str, db: Session = Depends(get_db), current_user:
 
 
 @router.get("/{project_id}/overview", response_model=ProjectOverview)
-def get_project_overview(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_project_overview(project_id: str, db: Session = Depends(get_db)):
     project_result = db.execute(
-        text("SELECT id, name, description, customer_id, status, budget, created_at, updated_at FROM projects WHERE id = :project_id"),
+        text("SELECT id, name, description, customer_id, status, budget, next_action, next_action_date, created_at, updated_at FROM projects WHERE id = :project_id"),
         {"project_id": project_id}
     ).first()
     
@@ -114,6 +116,8 @@ def get_project_overview(project_id: str, db: Session = Depends(get_db), current
         "customer_name": customer_name,
         "status": project_result.status,
         "amount": amount,
+        "next_action": project_result.next_action,
+        "next_action_date": project_result.next_action_date,
         "created_at": project_result.created_at,
         "updated_at": project_result.updated_at,
     }
@@ -306,3 +310,87 @@ def remove_project_contact(project_id: str, contact_id: str, db: Session = Depen
     db.commit()
     
     return {"message": "Contact removed from project successfully"}
+
+
+ALLOWED_STATUS = ["LEAD", "NEEDS_CONFIRMATION", "SOLUTION_DESIGN", "TECH_VALIDATION", "BUSINESS_NEGOTIATION", "WON", "AFTER_SALE", "LOST"]
+
+
+@router.patch("/{project_id}/status", response_model=ProjectStatusUpdateOut)
+def update_project_status(project_id: str, request: ProjectStatusUpdate, db: Session = Depends(get_db)):
+    if request.status not in ALLOWED_STATUS:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Allowed values: {', '.join(ALLOWED_STATUS)}")
+    
+    project_result = db.execute(
+        text("SELECT id, name, status FROM projects WHERE id = :project_id"),
+        {"project_id": project_id}
+    ).first()
+    
+    if not project_result:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    old_status = project_result.status
+    
+    db.execute(
+        text("UPDATE projects SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE id = :project_id"),
+        {"status": request.status, "project_id": project_id}
+    )
+    
+    history = ProjectStageHistory(
+        project_id=project_id,
+        from_status=old_status,
+        to_status=request.status,
+        remark=request.remark,
+    )
+    db.add(history)
+    
+    db.commit()
+    
+    updated_result = db.execute(
+        text("SELECT updated_at FROM projects WHERE id = :project_id"),
+        {"project_id": project_id}
+    ).first()
+    
+    return {
+        "id": project_result.id,
+        "name": project_result.name,
+        "old_status": old_status,
+        "new_status": request.status,
+        "updated_at": updated_result.updated_at,
+    }
+
+
+@router.patch("/{project_id}/next-action")
+def update_project_next_action(project_id: str, request: ProjectNextActionUpdate, db: Session = Depends(get_db)):
+    project_result = db.execute(
+        text("SELECT id FROM projects WHERE id = :project_id"),
+        {"project_id": project_id}
+    ).first()
+    
+    if not project_result:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    db.execute(
+        text("UPDATE projects SET next_action = :next_action, next_action_date = :next_action_date, updated_at = CURRENT_TIMESTAMP WHERE id = :project_id"),
+        {"next_action": request.next_action, "next_action_date": request.next_action_date, "project_id": project_id}
+    )
+    
+    db.commit()
+    
+    return {"message": "Next action updated successfully"}
+
+
+@router.get("/{project_id}/stage-history", response_model=List[ProjectStageHistoryOut])
+def get_project_stage_history(project_id: str, db: Session = Depends(get_db)):
+    history_result = db.execute(
+        text("SELECT id, project_id, from_status, to_status, remark, created_at FROM project_stage_history WHERE project_id = :project_id ORDER BY created_at DESC"),
+        {"project_id": project_id}
+    ).all()
+    
+    return [{
+        "id": h.id,
+        "project_id": h.project_id,
+        "from_status": h.from_status,
+        "to_status": h.to_status,
+        "remark": h.remark,
+        "created_at": h.created_at,
+    } for h in history_result]

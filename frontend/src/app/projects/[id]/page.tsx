@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Edit2, Trash2, Users, Plus, X, Calendar, AlertCircle, Clock, Brain, Zap, Target, Phone, Mail, Building2 } from "lucide-react";
+import { ArrowLeft, Edit2, Trash2, Users, Plus, X, Calendar, AlertCircle, Clock, Brain, Zap, Target, Phone, Mail, Building2, ChevronRight, AlertTriangle, Check, MessageSquare } from "lucide-react";
 import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/api";
 
 interface ProjectOverview {
@@ -16,6 +16,8 @@ interface ProjectOverview {
     amount: number;
     created_at: string;
     updated_at: string;
+    next_action?: string;
+    next_action_date?: string;
   };
   customer: {
     id: string;
@@ -68,20 +70,19 @@ interface CustomerContact {
   remark: string | null;
 }
 
+const STATUS_FLOW = [
+  { key: "LEAD", label: "线索阶段" },
+  { key: "NEEDS_CONFIRMATION", label: "需求确认" },
+  { key: "SOLUTION_DESIGN", label: "方案设计" },
+  { key: "TECH_VALIDATION", label: "技术验证" },
+  { key: "BUSINESS_NEGOTIATION", label: "商务谈判" },
+  { key: "WON", label: "已成交" },
+];
+
 const getStatusLabel = (status: string) => {
+  const found = STATUS_FLOW.find((s) => s.key === status);
+  if (found) return found.label;
   switch (status) {
-    case "LEAD":
-      return "线索阶段";
-    case "NEEDS_CONFIRMATION":
-      return "需求确认";
-    case "SOLUTION_DESIGN":
-      return "方案设计";
-    case "TECH_VALIDATION":
-      return "技术验证";
-    case "BUSINESS_NEGOTIATION":
-      return "商务谈判";
-    case "WON":
-      return "已成交";
     case "AFTER_SALE":
       return "售后维护";
     case "LOST":
@@ -244,6 +245,49 @@ const formatDateTime = (dateStr: string) => {
   return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
+const getNextStatus = (currentStatus: string): { key: string; label: string } | null => {
+  const currentIndex = STATUS_FLOW.findIndex((s) => s.key === currentStatus);
+  if (currentIndex >= 0 && currentIndex < STATUS_FLOW.length - 1) {
+    return STATUS_FLOW[currentIndex + 1];
+  }
+  return null;
+};
+
+const calculateRiskAlerts = (overview: ProjectOverview) => {
+  const alerts: { type: "warning" | "info"; message: string }[] = [];
+  
+  if (overview.contacts.length === 0) {
+    alerts.push({ type: "warning", message: "⚠️ 缺少项目联系人" });
+  }
+  
+  if (overview.project.status === "TECH_VALIDATION") {
+    const updatedAt = new Date(overview.project.updated_at);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays > 14) {
+      alerts.push({ type: "warning", message: "⚠️ 技术验证阶段停留过久" });
+    }
+  }
+  
+  if (overview.activities.length === 0) {
+    const createdAt = new Date(overview.project.created_at);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays > 30) {
+      alerts.push({ type: "warning", message: "⚠️ 项目长期无跟进" });
+    }
+  } else {
+    const lastActivityDate = new Date(overview.activities[0].activity_date);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays > 30) {
+      alerts.push({ type: "warning", message: "⚠️ 项目超过30天没有活动" });
+    }
+  }
+  
+  return alerts;
+};
+
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -252,6 +296,8 @@ export default function ProjectDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+  const [showNextActionModal, setShowNextActionModal] = useState(false);
   const [customerContacts, setCustomerContacts] = useState<CustomerContact[]>([]);
   const [addingContact, setAddingContact] = useState(false);
   const [contactError, setContactError] = useState("");
@@ -269,6 +315,14 @@ export default function ProjectDetailPage() {
     remark: "",
   });
 
+  const [advanceStatus, setAdvanceStatus] = useState("");
+  const [advanceRemark, setAdvanceRemark] = useState("");
+
+  const [nextAction, setNextAction] = useState({
+    next_action: "",
+    next_action_date: "",
+  });
+
   useEffect(() => {
     loadOverview();
   }, [id]);
@@ -282,6 +336,10 @@ export default function ProjectDetailPage() {
         description: data.project.description || "",
         status: data.project.status,
         amount: data.project.amount?.toString() || "",
+      });
+      setNextAction({
+        next_action: data.project.next_action || "",
+        next_action_date: data.project.next_action_date || "",
       });
     } catch (err) {
       console.error("Load overview error:", err);
@@ -352,9 +410,42 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleAdvanceStage = async () => {
+    if (!advanceStatus) return;
+    try {
+      await apiPatch(`/api/projects/${id}/status`, {
+        status: advanceStatus,
+        remark: advanceRemark || null,
+      });
+      setShowAdvanceModal(false);
+      setAdvanceStatus("");
+      setAdvanceRemark("");
+      loadOverview();
+    } catch (err) {
+      console.error("Advance stage error:", err);
+    }
+  };
+
+  const handleUpdateNextAction = async () => {
+    try {
+      await apiPatch(`/api/projects/${id}/next-action`, {
+        next_action: nextAction.next_action || null,
+        next_action_date: nextAction.next_action_date || null,
+      });
+      setShowNextActionModal(false);
+      loadOverview();
+    } catch (err) {
+      console.error("Update next action error:", err);
+    }
+  };
+
   const availableContacts = customerContacts.filter(
     (c) => !overview?.contacts.some((pc) => pc.contact_id === c.id)
   );
+
+  const currentStatusIndex = overview ? STATUS_FLOW.findIndex((s) => s.key === overview.project.status) : -1;
+  const nextStatus = overview ? getNextStatus(overview.project.status) : null;
+  const riskAlerts = overview ? calculateRiskAlerts(overview) : [];
 
   if (loading) {
     return (
@@ -435,6 +526,20 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {riskAlerts.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <span className="text-sm font-medium text-amber-700">AI销售提醒</span>
+          </div>
+          <div className="space-y-2">
+            {riskAlerts.map((alert, index) => (
+              <p key={index} className="text-sm text-amber-700">{alert.message}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-card rounded-xl shadow-sm p-6">
@@ -476,6 +581,41 @@ export default function ProjectDetailPage() {
                 <p className="text-sm">{formatDateTime(project.updated_at)}</p>
               </div>
             </div>
+          </div>
+
+          <div className="bg-card rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <MessageSquare className="w-4 h-4" />
+                <span>销售下一步</span>
+              </div>
+              <button
+                onClick={() => setShowNextActionModal(true)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors"
+              >
+                <Edit2 className="w-3 h-3" />
+                <span>编辑</span>
+              </button>
+            </div>
+            {project.next_action ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">下一步动作</p>
+                  <p className="text-sm font-medium">{project.next_action}</p>
+                </div>
+                {project.next_action_date && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">{formatDate(project.next_action_date)}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">暂无下一步动作</p>
+              </div>
+            )}
           </div>
 
           <div className="bg-card rounded-xl shadow-sm p-6">
@@ -573,6 +713,63 @@ export default function ProjectDetailPage() {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
+          <div className="bg-card rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Zap className="w-4 h-4" />
+                <span>项目阶段</span>
+              </div>
+              {nextStatus && project.status !== "WON" && project.status !== "LOST" && (
+                <button
+                  onClick={() => {
+                    setAdvanceStatus(nextStatus.key);
+                    setShowAdvanceModal(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                  <span>推进阶段</span>
+                </button>
+              )}
+            </div>
+            <div className="flex flex-col">
+              {STATUS_FLOW.map((status, index) => {
+                const isCompleted = index < currentStatusIndex;
+                const isCurrent = index === currentStatusIndex;
+                const isFuture = index > currentStatusIndex;
+                
+                return (
+                  <div key={status.key} className="flex items-center gap-4">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      isCompleted ? "bg-green-500 text-white" :
+                      isCurrent ? "bg-primary text-primary-foreground" :
+                      "bg-muted/50 text-muted-foreground"
+                    }`}>
+                      {isCompleted ? <Check className="w-4 h-4" /> : (index + 1)}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`h-0.5 ${
+                        isCompleted || isCurrent ? "bg-primary" : "bg-muted/50"
+                      }`}></div>
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      isCurrent ? "text-primary" :
+                      isCompleted ? "text-green-600" :
+                      "text-muted-foreground"
+                    }`}>
+                      {status.label}
+                    </span>
+                    {isCurrent && (
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusClass(status.key)}`}>
+                        当前
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-6">
               <Target className="w-4 h-4" />
@@ -832,6 +1029,116 @@ export default function ProjectDetailPage() {
                 className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {addingContact ? "添加中..." : "添加联系人"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdvanceModal && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAdvanceModal(false);
+          }}
+        >
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-semibold">推进阶段</h2>
+              <button
+                onClick={() => setShowAdvanceModal(false)}
+                className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">下一阶段 <span className="text-red-500">*</span></label>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-2 rounded-lg text-sm font-medium ${getStatusClass(advanceStatus)}`}>
+                    {getStatusLabel(advanceStatus)}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">备注</label>
+                <textarea
+                  value={advanceRemark}
+                  onChange={(e) => setAdvanceRemark(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all h-24 resize-none"
+                  placeholder="输入阶段推进备注（可选）"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-border">
+              <button
+                onClick={() => setShowAdvanceModal(false)}
+                className="px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleAdvanceStage}
+                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all hover:bg-primary/90"
+              >
+                确认推进
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNextActionModal && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNextActionModal(false);
+          }}
+        >
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-xl font-semibold">编辑下一步动作</h2>
+              <button
+                onClick={() => setShowNextActionModal(false)}
+                className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">下一步动作</label>
+                <input
+                  type="text"
+                  value={nextAction.next_action}
+                  onChange={(e) => setNextAction({ ...nextAction, next_action: e.target.value })}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  placeholder="例如：安排技术交流会议"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2 font-medium">日期</label>
+                <input
+                  type="date"
+                  value={nextAction.next_action_date}
+                  onChange={(e) => setNextAction({ ...nextAction, next_action_date: e.target.value })}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-border">
+              <button
+                onClick={() => setShowNextActionModal(false)}
+                className="px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleUpdateNextAction}
+                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all hover:bg-primary/90"
+              >
+                保存
               </button>
             </div>
           </div>

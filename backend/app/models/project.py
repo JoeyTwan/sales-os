@@ -28,5 +28,7 @@ class Project(Base):
     description = Column(Text, nullable=True)
     amount = Column(Integer, nullable=True)
     status = Column(ProjectStatus, nullable=False, default="LEAD")
+    next_action = Column(Text, nullable=True)
+    next_action_date = Column(String(20), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
